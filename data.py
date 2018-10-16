@@ -20,3 +20,8 @@ def generate_xor_data(n, continuous_x=False, nonsense_vars=0):
         X = np.random.uniform(-1, 1, (n, 2 + nonsense_vars))
     Y = np.transpose(X[:, 0] * X[:, 1] < 0)
     return (X, Y)
+
+def generate_single_variable_boundary(n, interval, boundary):
+    X = np.random.uniform(interval[0], interval[1], (n, 1))
+    Y = X > boundary
+    return (X, Y)
