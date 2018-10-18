@@ -4,55 +4,8 @@ from sklearn import tree
 
 from model_train import train
 from data import generate_xor_data, generate_single_variable_boundary
-
-"""
-define an INTERVAL as a tuple, where the entry at index 0 is the lower bound, and the entry at index 1
-is the upper bound, both exclusive.
-"""
-def interval_intersect(a, b):
-    if(min(a) == -float('inf') and min(b) == -float('inf')):
-        return True
-    elif(max(a) == float('inf') and max(b) == float('inf')):
-        return True
-    if(min(a) == -float('inf')):
-        return min(b) < max(a)
-    elif(min(b) == -float('inf')):
-        return min(a) < max(b)
-    elif(max(a) == float('inf')):
-        return min(a) < max(b)
-    elif(max(b) == float('inf')):
-        return min(b) < max(a)
-    print("general case")
-    radius_a = (a[1] - a[0])/2
-    radius_b = (b[1] - b[0])/2
-    centroid_a = radius_a + a[0]
-    centroid_b = radius_b + b[0]
-    return np.abs(centroid_b - centroid_a) < radius_a + radius_b
-
-def join_intervals(a, b):
-    if(not interval_intersect(a, b)):
-        return -1
-    return (max(a[0], b[0]), min(a[1], b[1]))
-
-def point_in_intervals(p, intervals):
-    for i in intervals:
-        if p > i[0] and p < i[1]:
-            return 1
-    return 0
-
-def test_intervals():
-    i1 = (0, 3)
-    i2 = (2, 4)
-    i3 = (3, 10)
-    i4 = (-1, 2)
-    print(i1, "intersects with", i2, "?", interval_intersect(i1, i2))
-    print(i1, "intersects with", i3, "?", interval_intersect(i1, i3))
-    print(i3, "intersects with", i4, "?", interval_intersect(i3, i4))
-    print(i3, "intersects with", i2, "?", interval_intersect(i3, i2))
-    print(i4, "intersects with", i1, "?", interval_intersect(i4, i1))
-    print("joining", i1, "and", i2, ":", join_intervals(i1, i2))
-    print("joining", i3, "and", i2, ":", join_intervals(i3, i2))
-    print("joining", i1, "and", i4, ":", join_intervals(i1, i4))
+from intervals import *
+from piecewise import piecewise_average_1d
 
 """
 PARAMETERS
@@ -127,7 +80,7 @@ def interactions_continuous(model, input_space_x, outcome_space_y, assignment, S
     unique = np.reshape(unique, (-1, 1))
     probs = np.reshape(counts/len(outcomes), (-1, 1))
     unshaped = np.hstack((unique, probs))
-    return (fix_shape(unshaped, np.unique(outcome_space_y)), decision_rules)
+    return fix_shape(unshaped, np.unique(outcome_space_y))
 
 def fix_shape(distribution, unique_Y):
     if(distribution.shape[0] == len(unique_Y)):
@@ -142,46 +95,39 @@ def fix_shape(distribution, unique_Y):
     return dist
 
 
+def recover_intervals(model, num_features):
+    split_feats = model.tree_.feature
+    thresholds = model.tree_.threshold
+    feat_thresholds = [[] for i in range(num_features)]
+    for i in range(len(split_feats)):
+        if(split_feats[i] >= 0):
+            feat_thresholds[split_feats[i]].append(thresholds[i])
+    intervals = []
+    for f in range(num_features):
+        t = feat_thresholds[f]
+        t.sort()
+        lower = - float("inf")
+        inter = []
+        for i in range(len(t)):
+            inter.append((lower, t[i]))
+            lower = t[i]
+        inter.append((t[len(t) - 1], float('inf')))
+        intervals.append(inter)
+    return intervals
 
-"""determines the range spanned by all variables in the X and Y dataset"""
-def determine_input_output_range(input_space_x, outcome_space_y):
-    x_max = input_space_x.max(axis=0)
-    x_min = input_space_x.min(axis=0)
-    y_max = input_space_y.max()
-    y_min = input_space_y.min()
-    x_intervals = np.transpose(np.hstack(x_min, x_max))
-    y_interval = [y_min, y_max]
-    return (x_intervals, y_interval)
-
-def cartesian_product(set1, set2):
-    product = []
-    for i in set1:
-        for j in set2:
-            if(type(i) is list):
-                product.append(i + [j])
+def generate_all_inputs(intervals):
+    inputs = []
+    for feature in intervals:
+        feature_inputs = []
+        for interval in feature:
+            if interval[0] == - float('inf'):
+                feature_inputs.append(interval[1] - 1)
+            elif interval[1] == float('inf'):
+                feature_inputs.append(interval[0] + 1)
             else:
-                product.append([i, j])
-
-def multiple_products(sets):
-    if(len(sets) <= 1):
-        return sets
-    else:
-        i = 2
-        product = cartesian_product(sets[0], sets[1])
-        while(i < len(sets)):
-            product = cartesian_product(product, sets[i])
-            i += 1
-        return product
-
-"""generates all possible combination of X inputs from x_intervals, a matrix describing
-the range of each variable in X"""
-def generate_all_inputs(input_space_x, outcome_space_y, step):
-    x_intervals, y_interval = determine_input_output_range(input_space_x, outcome_space_y)
-    x_ranges = [np.arange(x[0], x[1] + step, step) for x in x_intervals]
-    y_range = np.arange(y_interval[0], y_interval[1], step)
-    products = multiple_products(x_ranges)
-    return (products, y_range)
-
+                feature_inputs.append((interval[1] - interval[0])/2 + interval[0])
+        inputs.append(feature_inputs)
+    return inputs
 
 def aggregate_trees(trees, weights, input_space_x, outcome_space_y, assignment, S):
     weighted_average = 0
@@ -191,16 +137,6 @@ def aggregate_trees(trees, weights, input_space_x, outcome_space_y, assignment, 
         dist = interactions_continuous(t, input_space_x, outcome_space_y, assignment, S)[0]
         weighted_average += w * dist
     return weighted_average
-
-def plot_2D_binary_classifier(X_range, weights, intervals_per_classifier):
-    Y_totals = 0
-    for i in range(len(intervals_per_classifier)):
-        X_valid_intervals = intervals_per_classifier[i]
-        Y_totals += weights[i] * np.array([point_in_intervals(i, X_valid_intervals) for i in X_range])
-    plt.plot(X_range, Y_totals, 'ro')
-    plt.ylabel("classification")
-    plt.xlabel("input")
-    plt.show()
 
 def plot_2D_classifier(X_range, distribution):
     print("X_range", X_range)
@@ -215,15 +151,25 @@ def test_plot_single_variable():
     X_1, Y_1 = generate_single_variable_boundary(100, (-10, 10), 4)
     model_0 = train(X_0, Y_0)
     model_1 = train(X_1, Y_1)
-    weights = [.5, .5]
-    assignments = [[[i]] for i in np.arange(-10, 10, .5)]
-    s = [1]
+    intervals_0 = recover_intervals(model_0, 1)
+    intervals_1 = recover_intervals(model_1, 1)
+    inputs_0 = generate_all_inputs(intervals_0)
+    inputs_1 = generate_all_inputs(intervals_1)
+    values_0 = [interactions_continuous(model_0, X_0, Y_0, [[i]], [1])[1, 1] for i in inputs_0[0]]
+    values_1 = [interactions_continuous(model_1, X_1, Y_1, [[i]], [1])[1, 1] for i in inputs_1[0]]
+    piece_0 = [(intervals_0[0][i][0], intervals_0[0][i][1], [values_0[i]]) for i in range(len(intervals_0[0]))]
+    piece_1 = [(intervals_1[0][i][0], intervals_1[0][i][1], [values_1[i]]) for i in range(len(intervals_1[0]))]
+    avg = piecewise_average_1d([piece_0, piece_1])
+    x_vals = np.arange(-10, 10, .1)
+    i = 0
     distribution = []
-    for a in assignments:
-        interactions = aggregate_trees([model_0, model_1], weights, np.vstack((X_0, X_1)), np.vstack((Y_0, Y_1)), a, s)
-        print("interactions\n", interactions)
-        distribution.append(interactions[1, 1])
-    plot_2D_classifier(np.arange(-10, 10, .5), distribution)
+    for x in x_vals:
+        if x >= avg[i][0] and x < avg[i][1]:
+            distribution.append(avg[i][2])
+        else:
+            i += 1
+            distribution.append(avg[i][2])
+    plot_2D_classifier(x_vals, distribution)
 
 
 def test_nonsense_vars():
@@ -246,7 +192,7 @@ def test_continuous():
         print("Assignment:", a)
         for s in S:
             print("interactions for variables:", s)
-            print(interactions_continuous(model, X, Y, a, s)[0])
+            print(interactions_continuous(model, X, Y, a, s))
 
 #test_continuous()
 test_plot_single_variable()
