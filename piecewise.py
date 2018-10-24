@@ -45,7 +45,7 @@ def merge_two_1d(f1, f2):
         tail = intersect(last, f2[j])
         merged = merged[:-1] + tail
         j += 1
-        return merged
+    return merged
 
 """
 PARAMETERS:
