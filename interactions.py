@@ -1,4 +1,5 @@
 import numpy as np
+import time
 import matplotlib.pyplot as plt
 from sklearn import tree
 
@@ -139,8 +140,8 @@ def aggregate_trees(trees, weights, input_space_x, outcome_space_y, assignment, 
     return weighted_average
 
 def plot_2D_classifier(X_range, distribution):
-    print("X_range", X_range)
-    print("distribution", distribution)
+    #print("X_range", X_range)
+    #print("distribution", distribution)
     plt.plot(X_range, distribution)
     plt.ylabel("chance of classifying 1")
     plt.xlabel("input")
@@ -171,6 +172,39 @@ def test_plot_single_variable():
             distribution.append(avg[i][2])
     plot_2D_classifier(x_vals, distribution)
 
+def test_plot_many_trees(t):
+    data_sets = [generate_single_variable_boundary(100, (-10, 10), np.random.uniform(-5, 5)) for i in range(t)]
+    trees = [train(data[0], data[1]) for data in data_sets]
+    t = time.clock()
+    intervals = [recover_intervals(model, 1) for model in trees]
+    inputs = [generate_all_inputs(inter) for inter in intervals]
+    values = []
+    for i in range(len(trees)):
+        v_for_tree = []
+        for input in inputs[i][0]:
+            v = interactions_continuous(trees[i], data_sets[i][0], data_sets[i][1], [[input]], [1])[1, 1]
+            v_for_tree.append(v)
+        values.append(v_for_tree)
+    pieces = []
+    for i in range(len(trees)):
+        piece_for_tree = []
+        for j in range(len(intervals[i][0])):
+            piece = (intervals[i][0][j][0], intervals[i][0][j][1], [values[i][j]])
+            piece_for_tree.append(piece)
+        pieces.append(piece_for_tree)
+    avg = piecewise_average_1d(pieces)
+    x_vals = np.arange(-10, 10, .1)
+    i = 0
+    distribution = []
+    for x in x_vals:
+        if x >= avg[i][0] and x < avg[i][1]:
+            distribution.append(avg[i][2])
+        else:
+            i += 1
+            distribution.append(avg[i][2])
+    print("comp time", time.clock() - t)
+    plot_2D_classifier(x_vals, distribution)
+
 
 def test_nonsense_vars():
     X, Y = generate_xor_data(500, nonsense_vars=1)
@@ -195,4 +229,4 @@ def test_continuous():
             print(interactions_continuous(model, X, Y, a, s))
 
 #test_continuous()
-test_plot_single_variable()
+test_plot_many_trees(5)
