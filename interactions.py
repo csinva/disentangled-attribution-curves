@@ -1,4 +1,5 @@
 import numpy as np
+import time
 import matplotlib.pyplot as plt
 from sklearn import tree
 
@@ -174,6 +175,7 @@ def test_plot_single_variable():
 def test_plot_many_trees(t):
     data_sets = [generate_single_variable_boundary(100, (-10, 10), np.random.uniform(-5, 5)) for i in range(t)]
     trees = [train(data[0], data[1]) for data in data_sets]
+    t = time.clock()
     intervals = [recover_intervals(model, 1) for model in trees]
     inputs = [generate_all_inputs(inter) for inter in intervals]
     values = []
@@ -200,6 +202,7 @@ def test_plot_many_trees(t):
         else:
             i += 1
             distribution.append(avg[i][2])
+    print("comp time", time.clock() - t)
     plot_2D_classifier(x_vals, distribution)
 
 
@@ -226,4 +229,4 @@ def test_continuous():
             print(interactions_continuous(model, X, Y, a, s))
 
 #test_continuous()
-test_plot_many_trees(100)
+test_plot_many_trees(5)
