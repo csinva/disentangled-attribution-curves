@@ -25,3 +25,8 @@ def generate_single_variable_boundary(n, interval, boundary):
     X = np.random.uniform(interval[0], interval[1], (n, 1))
     Y = X > boundary
     return (X, Y)
+
+def generate_x_y_data(n, interval, f, features=1):
+    X = np.random.uniform(interval[0], interval[1], (n, features))
+    Y = np.apply_along_axis(f, 1, X)
+    return (X, Y)

@@ -3,8 +3,8 @@ import time
 import matplotlib.pyplot as plt
 from sklearn import tree
 
-from model_train import train
-from data import generate_xor_data, generate_single_variable_boundary
+from model_train import train, train_cont, train_rf
+from data import generate_xor_data, generate_single_variable_boundary, generate_x_y_data
 from intervals import *
 from piecewise import piecewise_average_1d
 
@@ -48,8 +48,7 @@ def interactions(model, input_space_x, outcome_space_y, assignment, S):
     probs = np.reshape(counts/len(outcomes), (-1, 1))
     return np.hstack((unique, probs))
 
-"""interactions for continuous X only!"""
-def interactions_continuous(model, input_space_x, outcome_space_y, assignment, S):
+def interactions_continuous(model, input_space_x, outcome_space_y, assignment, S, continuous_y = False):
     features = model.tree_.feature
     thresholds = model.tree_.threshold
     path = model.decision_path(assignment).indices
@@ -77,6 +76,8 @@ def interactions_continuous(model, input_space_x, outcome_space_y, assignment, S
             complies = complies and point_in_intervals(coord, [rule])
         if complies:
             outcomes.append(outcome_space_y[i])
+    if(continuous_y):
+        return np.average(outcomes)
     unique, counts = np.unique(outcomes, return_counts = True)
     unique = np.reshape(unique, (-1, 1))
     probs = np.reshape(counts/len(outcomes), (-1, 1))
@@ -131,12 +132,15 @@ def generate_all_inputs(intervals):
     return inputs
 
 def aggregate_trees(trees, weights, input_space_x, outcome_space_y, assignment, S):
-    weighted_average = 0
+    vals = np.unique(outcome_space_y)
+    weighted_average = np.transpose(np.vstack((vals, np.zeros(vals.shape[0]))))
     for i in range(len(trees)):
         t = trees[i]
         w = weights[i]
-        dist = interactions_continuous(t, input_space_x, outcome_space_y, assignment, S)[0]
-        weighted_average += w * dist
+        dist = interactions_continuous(t, input_space_x, outcome_space_y, assignment, S)
+        probs = dist[:, 1]
+        shaped = np.transpose(np.vstack((np.zeros(probs.shape[0]), probs)))
+        weighted_average += w * shaped
     return weighted_average
 
 def plot_2D_classifier(X_range, distribution):
@@ -228,5 +232,54 @@ def test_continuous():
             print("interactions for variables:", s)
             print(interactions_continuous(model, X, Y, a, s))
 
-#test_continuous()
-test_plot_many_trees(5)
+def test_continuous_y():
+    X, Y = generate_x_y_data(1000, (-10, 10), lambda a: a[0], features=2)
+    model = train_cont(X, Y)
+    outcomes = []
+    test_X = np.arange(-10, 10, .25)
+    for x in test_X:
+        y = interactions_continuous(model, X, Y, [[x, np.random.uniform(-10, 10)]], [0, 1], continuous_y = True)
+        outcomes.append(y)
+    plt.plot(test_X, outcomes)
+    plt.ylabel("predicted Y")
+    plt.xlabel("input X")
+    plt.show()
+
+def heat_map():
+    X, Y = generate_xor_data(10000, continuous_x=True)
+    model = train(X, Y)
+    intervals = recover_intervals(model, 2)
+    inputs = generate_all_inputs(intervals)
+    heat_values = []
+    for x_1 in inputs[0]:
+        heat_row = []
+        for x_2 in inputs[1]:
+            heat_row.append(interactions_continuous(model, X, Y, [[x_1, x_2]], [1, 1])[1, 1])
+        heat_values.append(heat_row)
+    print(heat_values)
+    fig, ax = plt.subplots(figsize=(7, 7))
+    im = ax.imshow(heat_values)
+
+    ax.set_xticks(np.arange(len(inputs[0])))
+    ax.set_yticks(np.arange(len(inputs[1])))
+    intervals_1_labels = [str((round(interval[0], 3), round(interval[1], 3))) for interval in intervals[0]]
+    intervals_2_labels = [str((round(interval[0], 3), round(interval[1], 3))) for interval in intervals[1]]
+    ax.set_xticklabels(intervals_1_labels)
+    ax.set_yticklabels(intervals_2_labels)
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right",rotation_mode="anchor")
+    plt.show()
+
+def test_interactions_rf(n):
+    X, Y = generate_xor_data(1000, continuous_x=True)
+    model = train_rf(X, Y, n)
+    estimators = model.estimators_
+    input = [[1, -1]]
+    s = [1, 0]
+    weights = [1/n] * n
+    t = time.clock()
+    dist = aggregate_trees(estimators, weights, X, Y, input, s)
+    print("comp time", time.clock() - t)
+    print(dist)
+
+test_interactions_rf(10000)
+#test_continuous_y()

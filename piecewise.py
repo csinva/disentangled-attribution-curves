@@ -1,3 +1,5 @@
+import time
+
 def intersect(i1, i2):
     if(i1[0] <= i2[0] and i1[1] >= i2[1]):
         ints = [(i1[0], i2[0], i1[2]), (i2[0], i2[1], i1[2] + i2[2]), (i2[1], i1[1], i1[2])]
@@ -58,6 +60,7 @@ a list of intervals and values that define a piecewise constant function, simila
 def piecewise_average_1d(functions):
     if(len(functions) <= 1):
         return functions
+
     functions[0].sort()
     functions[1].sort()
     merged = merge_two_1d(functions[0], functions[1])
@@ -72,9 +75,6 @@ def piecewise_average_1d(functions):
 
 def test_avg():
     piecewise_1 = [(- float('inf'), -1, [0]), (-1, 3, [2]), (3, float('inf'), [1])]
-    print("1", piecewise_1)
     piecewise_2 = [(- float('inf'), -2, [1]), (-2, 0, [0]), (0, 4, [2]), (4, float('inf'), [0])]
-    print("2", piecewise_2)
     avg = piecewise_average_1d([piecewise_1, piecewise_2])
-    print("avg", avg)
 test_avg()
