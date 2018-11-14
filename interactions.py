@@ -108,26 +108,18 @@ def recover_intervals(model, num_features):
     for f in range(num_features):
         t = feat_thresholds[f]
         t.sort()
-        lower = - float("inf")
-        inter = []
-        for i in range(len(t)):
-            inter.append((lower, t[i]))
-            lower = t[i]
-        inter.append((t[len(t) - 1], float('inf')))
-        intervals.append(inter)
+        intervals.append(t)
     return intervals
 
-def generate_all_inputs(intervals):
+def generate_all_inputs(intervals, di):
     inputs = []
     for feature in intervals:
-        feature_inputs = []
-        for interval in feature:
-            if interval[0] == - float('inf'):
-                feature_inputs.append(interval[1] - 1)
-            elif interval[1] == float('inf'):
-                feature_inputs.append(interval[0] + 1)
-            else:
-                feature_inputs.append((interval[1] - interval[0])/2 + interval[0])
+        start = feature[0] - di
+        feature_inputs = [start]
+        end = feature[-1] + di
+        for i in range(len(feature) - 1):
+            feature_inputs.append((feature[i+1] - feature[i])/2 + feature[i])
+        feature_inputs.append(end)
         inputs.append(feature_inputs)
     return inputs
 
@@ -151,63 +143,39 @@ def plot_2D_classifier(X_range, distribution):
     plt.xlabel("input")
     plt.show()
 
-def test_plot_single_variable():
-    X_0, Y_0 = generate_single_variable_boundary(100, (-10, 10), 0)
-    X_1, Y_1 = generate_single_variable_boundary(100, (-10, 10), 4)
-    model_0 = train(X_0, Y_0)
-    model_1 = train(X_1, Y_1)
-    intervals_0 = recover_intervals(model_0, 1)
-    intervals_1 = recover_intervals(model_1, 1)
-    inputs_0 = generate_all_inputs(intervals_0)
-    inputs_1 = generate_all_inputs(intervals_1)
-    values_0 = [interactions_continuous(model_0, X_0, Y_0, [[i]], [1])[1, 1] for i in inputs_0[0]]
-    values_1 = [interactions_continuous(model_1, X_1, Y_1, [[i]], [1])[1, 1] for i in inputs_1[0]]
-    piece_0 = [(intervals_0[0][i][0], intervals_0[0][i][1], [values_0[i]]) for i in range(len(intervals_0[0]))]
-    piece_1 = [(intervals_1[0][i][0], intervals_1[0][i][1], [values_1[i]]) for i in range(len(intervals_1[0]))]
-    avg = piecewise_average_1d([piece_0, piece_1])
-    x_vals = np.arange(-10, 10, .1)
-    i = 0
-    distribution = []
-    for x in x_vals:
-        if x >= avg[i][0] and x < avg[i][1]:
-            distribution.append(avg[i][2])
-        else:
-            i += 1
-            distribution.append(avg[i][2])
-    plot_2D_classifier(x_vals, distribution)
-
-def test_plot_many_trees(t):
-    data_sets = [generate_single_variable_boundary(100, (-10, 10), np.random.uniform(-5, 5)) for i in range(t)]
-    trees = [train(data[0], data[1]) for data in data_sets]
+def test_plot_many_trees2(n):
+    X, Y = generate_single_variable_boundary(100, (-10, 10), 0)
+    rf = train_rf(X, Y, n)
+    trees = rf.estimators_
     t = time.clock()
-    intervals = [recover_intervals(model, 1) for model in trees]
-    inputs = [generate_all_inputs(inter) for inter in intervals]
+    boundaries = []
+    inputs = []
+    for model in trees:
+        intervals = recover_intervals(model, 1)
+        ins = generate_all_inputs(intervals, 1)
+        boundaries += intervals[0]
+        inputs += ins[0]
+    boundaries.sort()
+    inputs.sort()
+    print("boundaries time", time.clock() - t)
     values = []
-    for i in range(len(trees)):
-        v_for_tree = []
-        for input in inputs[i][0]:
-            v = interactions_continuous(trees[i], data_sets[i][0], data_sets[i][1], [[input]], [1])[1, 1]
-            v_for_tree.append(v)
-        values.append(v_for_tree)
-    pieces = []
-    for i in range(len(trees)):
-        piece_for_tree = []
-        for j in range(len(intervals[i][0])):
-            piece = (intervals[i][0][j][0], intervals[i][0][j][1], [values[i][j]])
-            piece_for_tree.append(piece)
-        pieces.append(piece_for_tree)
-    avg = piecewise_average_1d(pieces)
-    x_vals = np.arange(-10, 10, .1)
-    i = 0
+    weights = [1/n] * n
+    for assignment in inputs:
+        v = aggregate_trees(trees, weights, X, Y, [[assignment]], [1])[1, 1]
+        values.append(v)
+    print("trees time", time.clock() - t)
+    x_axis = np.arange(-10, 10, .1)
     distribution = []
-    for x in x_vals:
-        if x >= avg[i][0] and x < avg[i][1]:
-            distribution.append(avg[i][2])
+    i = 0
+    boundaries = [- float('inf')] + boundaries + [float('inf')]
+    for x in x_axis:
+        if x >= boundaries[i] and x < boundaries[i + 1]:
+            distribution.append(values[i])
         else:
             i += 1
-            distribution.append(avg[i][2])
-    print("comp time", time.clock() - t)
-    plot_2D_classifier(x_vals, distribution)
+            distribution.append(values[i])
+    print("total time", time.clock() - t)
+    plot_2D_classifier(x_axis, distribution)
 
 
 def test_nonsense_vars():
@@ -281,5 +249,5 @@ def test_interactions_rf(n):
     print("comp time", time.clock() - t)
     print(dist)
 
-test_interactions_rf(10000)
-#test_continuous_y()
+test_plot_many_trees2(100)
+#test_interactions_rf(10000)
