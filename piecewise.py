@@ -1,5 +1,5 @@
 import time
-
+"""REMOVE LATER?"""
 def intersect(i1, i2):
     if(i1[0] <= i2[0] and i1[1] >= i2[1]):
         ints = [(i1[0], i2[0], i1[2]), (i2[0], i2[1], i1[2] + i2[2]), (i2[1], i1[1], i1[2])]
