@@ -143,8 +143,37 @@ def plot_2D_classifier(X_range, distribution):
     plt.xlabel("input")
     plt.show()
 
+def test_plot_many_trees3(n):
+    datasets = [generate_single_variable_boundary(100, (-20, 20), np.random.uniform(-10, 10)) for i in range(n)]
+    x_vals = np.arange(-20, 20, .1)
+    distribution = np.zeros(x_vals.shape[0])
+    t_start = time.clock()
+    for X, Y in datasets:
+        model = train(X, Y)
+        boundaries = recover_intervals(model, 1)
+        inputs = generate_all_inputs(boundaries, 1)[0]
+        values = []
+        for input in inputs:
+            v = interactions_continuous(model, X, Y, [[input]], [1])[1, 1]
+            values.append(v)
+        boundaries = [- float('inf')] + boundaries[0] + [float('inf')]
+        i = 0
+        j = 0
+        dist = []
+        while(i < len(boundaries) - 1 and j < len(x_vals)):
+            if x_vals[j] >= boundaries[i] and x_vals[j] < boundaries[i+1]:
+                dist.append(values[i])
+                j += 1
+            else:
+                i += 1
+        distribution += np.array(dist)
+    distribution = distribution/n
+    print("total time", time.clock() - t_start)
+    plot_2D_classifier(x_vals, distribution)
+
+
 def test_plot_many_trees2(n):
-    X, Y = generate_single_variable_boundary(100, (-10, 10), 0)
+    X, Y = generate_single_variable_boundary(100, (-20, 20), 0)
     rf = train_rf(X, Y, n)
     trees = rf.estimators_
     t = time.clock()
@@ -160,11 +189,17 @@ def test_plot_many_trees2(n):
     print("boundaries time", time.clock() - t)
     values = []
     weights = [1/n] * n
+    t_avg = 0
     for assignment in inputs:
+        t_start = time.clock()
         v = aggregate_trees(trees, weights, X, Y, [[assignment]], [1])[1, 1]
+        t_end = time.clock()
+        t_avg += t_end - t_start
         values.append(v)
+    print("average time", t_avg/len(inputs), "repetitions", len(inputs))
     print("trees time", time.clock() - t)
-    x_axis = np.arange(-10, 10, .1)
+    print("values", values)
+    x_axis = np.arange(-20, 20, .1)
     distribution = []
     i = 0
     boundaries = [- float('inf')] + boundaries + [float('inf')]
@@ -249,5 +284,5 @@ def test_interactions_rf(n):
     print("comp time", time.clock() - t)
     print(dist)
 
-test_plot_many_trees2(100)
+test_plot_many_trees3(10000)
 #test_interactions_rf(10000)
