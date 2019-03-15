@@ -1,8 +1,4 @@
 import numpy as np
-X = [[1, 1], [1, -1], [-1, 1], [-1, -1]]
-Y = [[0], [1], [1], [0]]
-X = np.array(X)
-Y = np.array(Y)
 
 """
 PARAMETERS
@@ -30,3 +26,7 @@ def generate_x_y_data(n, interval, f, features=1):
     X = np.random.uniform(interval[0], interval[1], (n, features))
     Y = np.apply_along_axis(f, 1, X)
     return (X, Y)
+
+def generate_correlated(n, means, stds, corr):
+    covs = [[stds[0] ** 2, stds[0] * stds[1] * corr], [stds[0] * stds[1] * corr, stds[1] ** 2]]
+    return np.random.multivariate_normal(means, covs, n), covs
