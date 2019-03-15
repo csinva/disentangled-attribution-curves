@@ -17,6 +17,11 @@ def train_rf(X, Y, n):
     model = model.fit(X, Y)
     return model
 
+def train_cont_rf(X, Y, n):
+    model = ensemble.RandomForestRegressor(n_estimators=n)
+    model = model.fit(X, Y)
+    return model
+
 def sanity_check(model):
     print("prediciton for (1, 1):", model.predict([[1, 1]]))
     print("prediction for (1, -1):", model.predict([[1, -1]]))

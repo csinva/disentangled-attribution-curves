@@ -3,8 +3,8 @@ import time
 import matplotlib.pyplot as plt
 from sklearn import tree
 
-from model_train import train, train_cont, train_rf
-from data import generate_xor_data, generate_single_variable_boundary, generate_x_y_data
+from model_train import *
+from data import *
 from intervals import *
 from piecewise import piecewise_average_1d
 
@@ -96,32 +96,150 @@ def fix_shape(distribution, unique_Y):
                 dist[j, 1] = distribution[i, 1]
     return dist
 
+#Helper function for path traversal/analysis
+#X, Y are datasets, where rows in X correspond to features, and Y is 1 column of outcomes
+#threshold, feature, and direction describe a decision rule:
+#e.g. for x_0>= 1.5 threshold = 1.5, feature = 0, direction = 'geq'
+#this function applies a the rule to the X dataset, and then applies that selection to the Y dataset as well
+def apply_rule(X, Y, threshold, feature, direction):
+    mask = []
+    if(direction == "geq"):
+        mask = X[:, feature] >= threshold
+    else:
+        mask = X[:, feature] < threshold
+    new_X = X[mask]
+    new_Y = Y[mask]
+    return (new_X, new_Y)
 
-def recover_intervals(model, num_features):
-    split_feats = model.tree_.feature
-    thresholds = model.tree_.threshold
-    feat_thresholds = [[] for i in range(num_features)]
-    for i in range(len(split_feats)):
-        if(split_feats[i] >= 0):
-            feat_thresholds[split_feats[i]].append(thresholds[i])
-    intervals = []
-    for f in range(num_features):
-        t = feat_thresholds[f]
-        t.sort()
-        intervals.append(t)
-    return intervals
+#The purpose of this function is to traverse each path from root to leaf in a tree
+#each leaf node will be associated with an set of intervals, one interval per feature specified in S, a value, and a count
+#of training points that fall into said intervals.
+def traverse_all_paths(model, input_space_x, outcome_space_y, S, continuous_y = False):
+    children_left = model.tree_.children_left
+    children_right = model.tree_.children_right
+    feature = model.tree_.feature
+    threshold = model.tree_.threshold
+    datasets = {}
+    num_feats = len(S)#np.count_nonzero(S)
+    datasets[0] = (input_space_x, outcome_space_y)
+    intervals = {}
+    intervals[0] =[(- float('inf'), float('inf'))] * num_feats
+    encounters = {}
+    encounters[0] = False
+    leaves = []
+    fringe = [0]
+    while len(fringe) > 0:
+        curr_node = fringe.pop()
+        bound = threshold[curr_node]
+        feat = feature[curr_node]
+        child_left = children_left[curr_node]
+        child_right = children_right[curr_node]
+        if (child_left != child_right):
+            X, Y = datasets[curr_node]
+            left_data = (X, Y)
+            right_data = (X, Y)
+            left_interval = intervals[curr_node]
+            right_interval = intervals[curr_node]
+            if(S[feat] == 1):
+                encounters[curr_node] = True
+                left_data = apply_rule(X, Y, bound, feat, "less")
+                right_data = apply_rule(X, Y, bound, feat, "geq")
 
-def generate_all_inputs(intervals, di):
-    inputs = []
-    for feature in intervals:
-        start = feature[0] - di
-        feature_inputs = [start]
-        end = feature[-1] + di
-        for i in range(len(feature) - 1):
-            feature_inputs.append((feature[i+1] - feature[i])/2 + feature[i])
-        feature_inputs.append(end)
-        inputs.append(feature_inputs)
-    return inputs
+                left_interval = intervals[curr_node][0:feat] + [(intervals[curr_node][feat][0], bound)] + intervals[curr_node][feat + 1:len(intervals[curr_node])]
+                right_interval = intervals[curr_node][0:feat] + [(bound, intervals[curr_node][feat][1])] + intervals[curr_node][feat + 1:len(intervals[curr_node])]
+            encounters[child_left] = encounters[curr_node]
+            encounters[child_right] = encounters[curr_node]
+            datasets[child_left] = left_data
+            datasets[child_right] = right_data
+            intervals[child_left] = left_interval
+            intervals[child_right] = right_interval
+            fringe.append(child_left)
+            fringe.append(child_right)
+        else:
+            leaves.append(curr_node)
+    values = []
+    if(continuous_y):
+        for leaf in leaves:
+            X, Y = datasets[leaf]
+            inter = intervals[leaf]
+            average = np.average(Y)
+            if(encounters[leaf]):
+                values.append(inter + [average] + [len(Y)])
+        return values
+    for leaf in leaves:
+        X, Y = datasets[leaf]
+        inter = intervals[leaf]
+        proportion = np.count_nonzero(Y == 1)/Y.shape[0]
+        if(encounters[leaf]):
+            values.append(inter + [proportion] + [len(Y)])
+    return values
+
+def fill_1d(line, counts, interval, val, count, rng, di):
+    lower_bound = max(interval[0], rng[0])
+    lower_bound = min(lower_bound, rng[-1])
+    upper_bound = min(interval[1], rng[-1])
+    upper_bound = max(upper_bound, rng[0])
+    start_index = np.nonzero(rng - lower_bound >= 0)[0][0]
+    end_index = np.nonzero(rng - upper_bound >= 0)[0][0]
+    for i in range(start_index, end_index):
+        line[i] += count * val
+        counts[i] += count
+    return
+
+def make_line(values, interval_x, di, S):
+    x_axis = np.arange(interval_x[0], interval_x[1] + di, di)
+    line = np.zeros(x_axis.shape[0] - 1)
+    counts = np.zeros(x_axis.shape[0] - 1)
+    num_vars = len(S)
+    ind = np.nonzero(S)[0][0]
+    for v in values:
+        x_inter = v[0:num_vars][ind]
+        val, count = v[num_vars:]
+        fill_1d(line, counts, x_inter, val, count, x_axis, di)
+    for i in range(len(counts)):
+        if(counts[i] == 0):
+            counts[i] = 1
+    return line/counts
+
+def fill_2d(grid, counts, x_interval, y_interval, val, count, x_rng, y_rng, x_di, y_di):
+    x_lower_bound = max(x_interval[0], x_rng[0])
+    x_lower_bound = min(x_lower_bound, x_rng[-1])
+    x_upper_bound = min(x_interval[1], x_rng[-1])
+    x_upper_bound = max(x_upper_bound, x_rng[0])
+    x_start_index = np.nonzero(x_rng - x_lower_bound >= 0)[0][0]
+    x_end_index = np.nonzero(x_rng - x_upper_bound >= 0)[0][0]
+
+    y_lower_bound = max(y_interval[0], y_rng[0])
+    y_lower_bound = min(y_lower_bound, y_rng[-1])
+    y_upper_bound = min(y_interval[1], y_rng[-1])
+    y_upper_bound = max(y_upper_bound, y_rng[0])
+    y_start_index = np.nonzero(y_rng - y_lower_bound >= 0)[0][0]
+    y_end_index = np.nonzero(y_rng - y_upper_bound >= 0)[0][0]
+    for y in range(y_start_index, y_end_index):
+        for x in range(x_start_index, x_end_index):
+            grid[y][x] += count * val
+            counts[y][x] += count
+    return
+
+def make_grid(values, interval_x, interval_y, di_x, di_y, S):
+    x_rng = np.arange(interval_x[0], interval_x[1] + di_x, di_x)
+    y_rng = np.arange(interval_y[0], interval_y[1] + di_y, di_y)
+    grid = np.zeros((len(y_rng) - 1, len(x_rng) - 1))
+    counts = np.zeros((len(y_rng) - 1, len(x_rng) - 1))
+    num_vars = len(S)
+    for v in values:
+        z = np.nonzero(S)
+        x_ind = z[0][0]
+        y_ind = z[0][1]
+        x_inter = v[0:num_vars][x_ind]
+        y_inter = v[0:num_vars][y_ind]
+        xval, count = v[num_vars:]
+        fill_2d(grid, counts, x_inter, y_inter, xval, count, x_rng, y_rng, di_x, di_y)
+    for i in range(grid.shape[0]):
+        for j in range(grid.shape[1]):
+            if counts[i][j] == 0:
+                counts[i][j] = 1
+    return grid/counts
 
 def aggregate_trees(trees, weights, input_space_x, outcome_space_y, assignment, S):
     vals = np.unique(outcome_space_y)
@@ -134,120 +252,3 @@ def aggregate_trees(trees, weights, input_space_x, outcome_space_y, assignment, 
         shaped = np.transpose(np.vstack((np.zeros(probs.shape[0]), probs)))
         weighted_average += w * shaped
     return weighted_average
-
-def plot_2D_classifier(X_range, distribution):
-    #print("X_range", X_range)
-    #print("distribution", distribution)
-    plt.plot(X_range, distribution)
-    plt.ylabel("chance of classifying 1")
-    plt.xlabel("input")
-    plt.show()
-
-def test_plot_many_trees2(n):
-    X, Y = generate_single_variable_boundary(100, (-10, 10), 0)
-    rf = train_rf(X, Y, n)
-    trees = rf.estimators_
-    t = time.clock()
-    boundaries = []
-    inputs = []
-    for model in trees:
-        intervals = recover_intervals(model, 1)
-        ins = generate_all_inputs(intervals, 1)
-        boundaries += intervals[0]
-        inputs += ins[0]
-    boundaries.sort()
-    inputs.sort()
-    print("boundaries time", time.clock() - t)
-    values = []
-    weights = [1/n] * n
-    for assignment in inputs:
-        v = aggregate_trees(trees, weights, X, Y, [[assignment]], [1])[1, 1]
-        values.append(v)
-    print("trees time", time.clock() - t)
-    x_axis = np.arange(-10, 10, .1)
-    distribution = []
-    i = 0
-    boundaries = [- float('inf')] + boundaries + [float('inf')]
-    for x in x_axis:
-        if x >= boundaries[i] and x < boundaries[i + 1]:
-            distribution.append(values[i])
-        else:
-            i += 1
-            distribution.append(values[i])
-    print("total time", time.clock() - t)
-    plot_2D_classifier(x_axis, distribution)
-
-
-def test_nonsense_vars():
-    X, Y = generate_xor_data(500, nonsense_vars=1)
-    model = train(X, Y)
-    X_tests = [[[1, 1, -1]], [[1, -1, -1]], [[1, 1, 1]], [[-1, 1, 1]]]
-    for a in X_tests:
-        print("Assignment:", a)
-        for i in range(5):
-            s = np.random.choice([1, 0], (3))
-            print("interactions for variables:", s)
-            print(interactions(model, X, Y, a, s))
-
-def test_continuous():
-    X, Y = generate_xor_data(10000, continuous_x=True)
-    model = train(X, Y)
-    X_tests = [[[-.5, -.5]], [[.5, .5]], [[-.5, .5]]]
-    S = [[1, 0], [0, 1], [0, 0], [1, 1]]
-    for a in X_tests:
-        print("Assignment:", a)
-        for s in S:
-            print("interactions for variables:", s)
-            print(interactions_continuous(model, X, Y, a, s))
-
-def test_continuous_y():
-    X, Y = generate_x_y_data(1000, (-10, 10), lambda a: a[0], features=2)
-    model = train_cont(X, Y)
-    outcomes = []
-    test_X = np.arange(-10, 10, .25)
-    for x in test_X:
-        y = interactions_continuous(model, X, Y, [[x, np.random.uniform(-10, 10)]], [0, 1], continuous_y = True)
-        outcomes.append(y)
-    plt.plot(test_X, outcomes)
-    plt.ylabel("predicted Y")
-    plt.xlabel("input X")
-    plt.show()
-
-def heat_map():
-    X, Y = generate_xor_data(10000, continuous_x=True)
-    model = train(X, Y)
-    intervals = recover_intervals(model, 2)
-    inputs = generate_all_inputs(intervals)
-    heat_values = []
-    for x_1 in inputs[0]:
-        heat_row = []
-        for x_2 in inputs[1]:
-            heat_row.append(interactions_continuous(model, X, Y, [[x_1, x_2]], [1, 1])[1, 1])
-        heat_values.append(heat_row)
-    print(heat_values)
-    fig, ax = plt.subplots(figsize=(7, 7))
-    im = ax.imshow(heat_values)
-
-    ax.set_xticks(np.arange(len(inputs[0])))
-    ax.set_yticks(np.arange(len(inputs[1])))
-    intervals_1_labels = [str((round(interval[0], 3), round(interval[1], 3))) for interval in intervals[0]]
-    intervals_2_labels = [str((round(interval[0], 3), round(interval[1], 3))) for interval in intervals[1]]
-    ax.set_xticklabels(intervals_1_labels)
-    ax.set_yticklabels(intervals_2_labels)
-    plt.setp(ax.get_xticklabels(), rotation=45, ha="right",rotation_mode="anchor")
-    plt.show()
-
-def test_interactions_rf(n):
-    X, Y = generate_xor_data(1000, continuous_x=True)
-    model = train_rf(X, Y, n)
-    estimators = model.estimators_
-    input = [[1, -1]]
-    s = [1, 0]
-    weights = [1/n] * n
-    t = time.clock()
-    dist = aggregate_trees(estimators, weights, X, Y, input, s)
-    print("comp time", time.clock() - t)
-    print(dist)
-
-test_plot_many_trees2(100)
-#test_interactions_rf(10000)
