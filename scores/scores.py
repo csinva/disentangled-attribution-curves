@@ -14,19 +14,15 @@ import eli5
 # arg2 - type of importance ('mdi', 'mda', our_thing')
 # some methods (mda, our thing) require X and Y for calculating importance
     # passing in training data / testing data have different implications
+# returns: np array of 1 score for each variable
 def get_importance_scores(model, score_type='mdi', X=None, Y=None):
     if score_type == 'mdi':
         return model.feature_importances_
     elif score_type == 'mda':
-        return eli5.sklearn.PermutationImportance(model).fit(X, Y).feature_importances_
+        return eli5.sklearn.PermutationImportance(model, random_state=1, n_iter=10).fit(X, Y).feature_importances_
     else:
         raise NotImplementedError(f'{score_type} not implemented')
-        
-# arg1 -  train_x: N x p
-# arg2 - train_y: N x 1
-# returns: list of idxs p ranked by how important each of them are - each in the range [0, p)
-def rank_features(train_X, train_y):
-    return
+
 
 # arg1 -  train_x: N x p
 # arg2 - train_y: N x 1
