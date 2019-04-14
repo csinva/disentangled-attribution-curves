@@ -3,7 +3,9 @@ import time
 import matplotlib.pyplot as plt
 from sklearn import tree
 
-from model_train import *
+# from model_train import *
+import sys
+sys.path.append('../data')
 from data import *
 from intervals import *
 from piecewise import piecewise_average_1d
