@@ -3,8 +3,8 @@ import time
 import matplotlib.pyplot as plt
 from sklearn import tree
 
-from model_train import *
-from data import *
+#from model_train import *
+#from data import *
 from intervals import *
 from piecewise import piecewise_average_1d
 
@@ -83,6 +83,65 @@ def interactions_continuous(model, input_space_x, outcome_space_y, assignment, S
     probs = np.reshape(counts/len(outcomes), (-1, 1))
     unshaped = np.hstack((unique, probs))
     return fix_shape(unshaped, np.unique(outcome_space_y))
+
+def fast_interactions(model, input_space_x, outcome_space_y, assignment, S, continuous_y=True, class_id=1):
+    features = model.tree_.feature
+    thresholds = model.tree_.threshold
+    path = model.decision_path(assignment).indices
+    features_used = features[path]
+    remove_leaves = features_used != -2
+    features_used = features_used[remove_leaves]
+    mask = S[features_used] == 1
+    features_relevant = features_used[mask]
+    if(len(features_relevant) == 0):
+        return "never encountered relevant features"
+    thresholds_used = thresholds[path]
+    thresholds_used = thresholds_used[remove_leaves]
+    thresholds_relevant = thresholds_used[mask]
+    geq = np.transpose(np.transpose(assignment)[features_relevant]) >= thresholds_relevant
+    input_greater = np.transpose(np.transpose(input_space_x)[features_relevant]) >= thresholds_relevant
+    output_mask =  np.logical_and.reduce(input_greater == geq, axis = -1)
+    output_mask = np.reshape(output_mask, (1, -1))[0]
+    masked_y = outcome_space_y[output_mask]
+    if(continuous_y):
+        return np.mean(masked_y)
+    else:
+        counts = np.count_nonzero(masked_y == class_id)
+        return counts/len(masked_y)
+
+def interactions_set(model, input_space_x, outcome_space_y, assignment, S, continuous_y=True, class_id=1):
+    features = model.tree_.feature
+    thresholds = model.tree_.threshold
+    path = model.decision_path(assignment).indices
+    features_used = features[path]
+    remove_leaves = features_used != -2
+    features_used = features_used[remove_leaves]
+    mask = S[features_used] == 1
+    features_relevant = features_used[mask]
+    if(len(features_relevant) == 0):
+        return "never encountered relevant features"
+    thresholds_used = thresholds[path]
+    thresholds_used = thresholds_used[remove_leaves]
+    thresholds_relevant = thresholds_used[mask]
+    geq_list = np.transpose(np.transpose(assignment)[features_relevant]) >= thresholds_relevant
+    input_greater = np.transpose(np.transpose(input_space_x)[features_relevant]) >= thresholds_relevant
+    outputs = []
+    for geq in geq_list:
+        output_mask =  np.logical_and.reduce(input_greater == geq, axis = -1)
+        output_mask = np.reshape(output_mask, (1, -1))[0]
+        masked_y = outcome_space_y[output_mask]
+        if(continuous_y):
+            outputs.append(np.mean(masked_y))
+        else:
+            counts = np.count_nonzero(masked_y == class_id)
+            outputs.append(counts/len(masked_y))
+    return outputs
+def interactions_forest(forest, input_space_x, outcome_space_y, assignment, S, continuous_y=True, class_id=1):
+    models = forest.estimators_
+    avg = 0
+    for model in models:
+        avg += np.array(interactions_set(model, input_space_x, outcome_space_y, assignment, S, continuous_y=True, class_id=1))
+    return avg/len(models)
 
 def fix_shape(distribution, unique_Y):
     if(distribution.shape[0] == len(unique_Y)):
@@ -240,6 +299,30 @@ def make_grid(values, interval_x, interval_y, di_x, di_y, S):
             if counts[i][j] == 0:
                 counts[i][j] = 1
     return grid/counts
+
+def make_curve(model, input_space_x, outcome_space_y, S, interval_x, di, continuous_y = False):
+    vals = traverse_all_paths(model, input_space_x, outcome_space_y, S, continuous_y = False)
+    line = make_line(vals, interval_x, di, S)
+    return line
+
+def make_map(model, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, continuous_y = False):
+    vals = traverse_all_paths(model, input_space_x, outcome_space_y, S, continuous_y = False)
+    grid = make_grid(vals, interval_x, interval_y, di_x, di_y, S)
+    return grid
+
+def make_curve_forest(forest, input_space_x, outcome_space_y, S, interval_x, di, continuous_y = False):
+    models = forest.estimators_
+    final_curve = 0
+    for model in models:
+        final_curve += make_curve(model, input_space_x, outcome_space_y, S, interval_x, di, continuous_y = False)
+    return final_curve/len(models)
+
+def make_map_forest(forest, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, continuous_y = False):
+    model = forest.estimators_
+    final_grid = 0
+    for model in models:
+        final_grid += make_map(model, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, continuous_y = False)
+    return final_grid/len(models)
 
 def aggregate_trees(trees, weights, input_space_x, outcome_space_y, assignment, S):
     vals = np.unique(outcome_space_y)
