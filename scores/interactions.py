@@ -132,17 +132,22 @@ def interactions_set(model, input_space_x, outcome_space_y, assignment, S, conti
         output_mask =  np.logical_and.reduce(input_greater == geq, axis = -1)
         output_mask = np.reshape(output_mask, (1, -1))[0]
         masked_y = outcome_space_y[output_mask]
+        if len(masked_y) == 0:
+            return 0
         if(continuous_y):
             outputs.append(np.mean(masked_y))
         else:
             counts = np.count_nonzero(masked_y == class_id)
             outputs.append(counts/len(masked_y))
     return outputs
+
 def interactions_forest(forest, input_space_x, outcome_space_y, assignment, S, continuous_y=True, class_id=1):
     models = forest.estimators_
     avg = 0
     for model in models:
-        avg += np.array(interactions_set(model, input_space_x, outcome_space_y, assignment, S, continuous_y=True, class_id=1))
+        val = interactions_set(model, input_space_x, outcome_space_y, assignment, S, continuous_y=True, class_id=1)
+        if val != "never encountered relevant features":
+            avg += np.array(val)
     return avg/len(models)
 
 def fix_shape(distribution, unique_Y):
@@ -247,7 +252,7 @@ def fill_1d(line, counts, interval, val, count, rng, di):
         counts[i] += count
     return
 
-def make_line(values, interval_x, di, S):
+def make_line(values, interval_x, di, S, ret_counts=False):
     x_axis = np.arange(interval_x[0], interval_x[1] + di, di)
     line = np.zeros(x_axis.shape[0] - 1)
     counts = np.zeros(x_axis.shape[0] - 1)
@@ -260,6 +265,8 @@ def make_line(values, interval_x, di, S):
     for i in range(len(counts)):
         if(counts[i] == 0):
             counts[i] = 1
+    if(ret_counts):
+        return line/counts, counts
     return line/counts
 
 def fill_2d(grid, counts, x_interval, y_interval, val, count, x_rng, y_rng, x_di, y_di):
@@ -282,7 +289,7 @@ def fill_2d(grid, counts, x_interval, y_interval, val, count, x_rng, y_rng, x_di
             counts[y][x] += count
     return
 
-def make_grid(values, interval_x, interval_y, di_x, di_y, S):
+def make_grid(values, interval_x, interval_y, di_x, di_y, S, ret_counts=False):
     x_rng = np.arange(interval_x[0], interval_x[1] + di_x, di_x)
     y_rng = np.arange(interval_y[0], interval_y[1] + di_y, di_y)
     grid = np.zeros((len(y_rng) - 1, len(x_rng) - 1))
@@ -300,15 +307,17 @@ def make_grid(values, interval_x, interval_y, di_x, di_y, S):
         for j in range(grid.shape[1]):
             if counts[i][j] == 0:
                 counts[i][j] = 1
+    if(ret_counts):
+        return grid/counts, counts
     return grid/counts
 
 def make_curve(model, input_space_x, outcome_space_y, S, interval_x, di, continuous_y = False):
-    vals = traverse_all_paths(model, input_space_x, outcome_space_y, S, continuous_y = False)
+    vals = traverse_all_paths(model, input_space_x, outcome_space_y, S, continuous_y)
     line = make_line(vals, interval_x, di, S)
     return line
 
 def make_map(model, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, continuous_y = False):
-    vals = traverse_all_paths(model, input_space_x, outcome_space_y, S, continuous_y = False)
+    vals = traverse_all_paths(model, input_space_x, outcome_space_y, S, continuous_y)
     grid = make_grid(vals, interval_x, interval_y, di_x, di_y, S)
     return grid
 
@@ -316,15 +325,48 @@ def make_curve_forest(forest, input_space_x, outcome_space_y, S, interval_x, di,
     models = forest.estimators_
     final_curve = 0
     for model in models:
-        final_curve += make_curve(model, input_space_x, outcome_space_y, S, interval_x, di, continuous_y = False)
+        final_curve += make_curve(model, input_space_x, outcome_space_y, S, interval_x, di, continuous_y)
     return final_curve/len(models)
 
 def make_map_forest(forest, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, continuous_y = False):
-    model = forest.estimators_
+    models = forest.estimators_
     final_grid = 0
     for model in models:
-        final_grid += make_map(model, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, continuous_y = False)
+        final_grid += make_map(model, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, continuous_y)
     return final_grid/len(models)
+
+def variance1D(forest, X, y, S, interval_x, di_x, continuous_y=True):
+    data_mean = np.mean(y)
+    models = forest.estimators_
+    total_var = 0
+    for model in models:
+        vals = traverse_all_paths(model, X, y, S, continuous_y)
+        line, counts = make_line(vals, interval_x, di_x, S, ret_counts=True)
+        line -= data_mean
+        total_var += np.sum(counts * line ** 2)/np.sum(counts)
+    return (total_var/len(models))/np.var(y)
+
+def variance2D(forest, X, y, S, intervals, dis, continuous_y=True):
+    data_mean = np.mean(y)
+    models = forest.estimators_
+    total_var = 0
+    S1 = np.zeros(S.shape)
+    S2 = np.zeros(S.shape)
+    nonzero = np.nonzero(S)[0]
+    S1[nonzero[0]] = 1
+    S2[nonzero[1]] = 1
+    for model in models:
+        vals = traverse_all_paths(model, X, y, S, continuous_y)
+        vals1 = traverse_all_paths(model, X, y, S1, continuous_y)
+        vals2 = traverse_all_paths(model, X, y, S2, continuous_y)
+        grid, counts = make_grid(vals, intervals[0], intervals[1], dis[0], dis[1], S, ret_counts=True)
+        line1 = make_line(vals1, intervals[0], dis[0], S1)
+        line2 = make_line(vals2, intervals[1], dis[1], S2)
+        grid = grid - line1
+        grid = np.transpose(np.transpose(grid) - line2)
+        grid += data_mean
+        total_var += np.sum(counts * grid ** 2)/np.sum(counts)
+    return (total_var/len(models))/np.var(y)
 
 def aggregate_trees(trees, weights, input_space_x, outcome_space_y, assignment, S):
     vals = np.unique(outcome_space_y)
