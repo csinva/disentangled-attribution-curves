@@ -19,7 +19,7 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 import interactions
 from scipy import interpolate
 
-def fit_logit_and_rfs():
+def fit_logit_and_rfs(dset_names, data_dir, out_dir, random_state=42):
     
     logit_test_scores = []
     rf_test_scores = []
@@ -31,9 +31,8 @@ def fit_logit_and_rfs():
 
 
         train_X, test_X, train_y, test_y = train_test_split(X, y, random_state=random_state)
-
-        logit = LogisticRegression(solver='liblinear', multi_class='auto') # liblinear best for small dsets, otherwise lbfgs
-        rf = RandomForestClassifier(n_estimators=100)
+        logit = LogisticRegression(solver='liblinear', multi_class='auto', random_state=random_state) # liblinear best for small dsets, otherwise lbfgs
+        rf = RandomForestClassifier(n_estimators=100, random_state=random_state)
     #     print(dset_name, X.shape)
         logit.fit(train_X, train_y)
         rf.fit(train_X, train_y)
@@ -50,4 +49,4 @@ def fit_logit_and_rfs():
                'dset_name': dset_names,
                'rf': rfs}
     pkl.dump(classification_results, 
-             open(oj(out_dir, 'classification_results.pkl'), 'wb'))
+             open(oj(out_dir, 'classification_results_orig_seeded.pkl'), 'wb'))

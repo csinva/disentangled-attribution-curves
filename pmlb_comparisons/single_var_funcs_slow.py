@@ -36,9 +36,6 @@ def get_feats(X, feat_nums=[0], add_feature=False):
 def score_logistic_onevar(train_X, train_y, test_X, test_y, feat_nums, f, add_feature):
     logit = LogisticRegression(solver='liblinear', multi_class='auto') # liblinear best for small dsets, otherwise lbfgs
 
-    # full training
-#     print('full logit score', row.logit_test_score)
-
     # get one var at at time
     if not add_feature:
         logit.fit(get_feats(train_X, feat_nums, add_feature), train_y)
@@ -134,32 +131,36 @@ def calc_single_var_scores(results, data_dir, out_dir, random_state, add_feature
         logit_score_orig_onevar_list = []
         logit_score_altered_onevar_list = []
         if all_features:
-            feats_to_try = []
+            feats_to_try = list(range(num_features))
         else:
             feats_to_try = [np.argsort(feature_scores_mdi)[-1]]
             
-        for i in range(num_features):
-            feat_nums = [i] # list of length 1 - longer lists not supported yet
-            feat_vals = get_feats(X, feat_nums)
-            feat_val_min = np.min(X)
-            feat_val_max = np.max(X)
-    #         print(f'min {feat_val_min} max {feat_val_max}')
+        try:
+            for i in range(feats_to_try):
+                feat_nums = [i] # list of length 1 - longer lists not supported yet
+                feat_vals = get_feats(X, feat_nums)
+                feat_val_min = np.min(X)
+                feat_val_max = np.max(X)
+        #         print(f'min {feat_val_min} max {feat_val_max}')
 
-            # appropriate variable to get importance for
-            S = np.zeros(num_features)
-            S[feat_nums[0]]= 1
+                # appropriate variable to get importance for
+                S = np.zeros(num_features)
+                S[feat_nums[0]]= 1
 
-            x_axis, scores_on_spaced_line = single_var_grid_scores_and_plot(rf, train_X, train_y, S, (feat_val_min, feat_val_max), plot=False)
-            f = interpolate.interp1d(x_axis, scores_on_spaced_line, kind='nearest') # function to interpolate the scores
+                x_axis, scores_on_spaced_line = single_var_grid_scores_and_plot(rf, train_X, train_y, S, (feat_val_min, feat_val_max), plot=False)
+                f = interpolate.interp1d(x_axis, scores_on_spaced_line, kind='nearest') # function to interpolate the scores
 
+                test_scores = interactions_forest(forest, X, y, test_set, np.array([1, 0]))
 
-            logit_score_orig_onevar, logit_score_altered_onevar = score_logistic_onevar(train_X, train_y, test_X, test_y, feat_nums, f, add_feature=add_feature)
-            logit_score_orig_onevar_list.append(logit_score_orig_onevar)
-            logit_score_altered_onevar_list.append(logit_score_altered_onevar)    
+                logit_score_orig_onevar, logit_score_altered_onevar = score_logistic_onevar(train_X, train_y, test_X, test_y, feat_nums, f, add_feature=add_feature)
+                logit_score_orig_onevar_list.append(logit_score_orig_onevar)
+                logit_score_altered_onevar_list.append(logit_score_altered_onevar)    
 
-        score_results['logit_score_orig_onevar_list'].append(logit_score_orig_onevar_list)
-        score_results['logit_score_altered_onevar_list'].append(logit_score_altered_onevar_list)
-
+            score_results['logit_score_orig_onevar_list'].append(logit_score_orig_onevar_list)
+            score_results['logit_score_altered_onevar_list'].append(logit_score_altered_onevar_list)
+        except:
+            score_results['logit_score_orig_onevar_list'].append(np.nan)
+            score_results['logit_score_altered_onevar_list'].append(np.nan)
 
         # saving
         scores_df = pd.DataFrame(score_results)
