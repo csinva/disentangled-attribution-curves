@@ -1,7 +1,5 @@
 import sys
 from tqdm import tqdm
-import matplotlib.pyplot as plt
-import seaborn as sns
 import pmlb as dsets
 import numpy as np
 import pickle as pkl
@@ -14,28 +12,31 @@ from numpy import array as arr
 # sklearn models
 sys.path.append('../scores')
 import scores
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.naive_bayes import GaussianNB
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-
+from sklearn.metrics import accuracy_score
 import interactions
 from scipy import interpolate
 
-dset_num = 0
-if len(sys.argv) > 1: # takes one arg (the dset_num)
-    dset_num = int(sys.argv[1])
+dset_name = 'analcatdata_aids'
+classification_only = False
+if len(sys.argv) > 1: # first arg (the dset_name)
+    dset_name = str(sys.argv[1])
+if len(sys.argv) > 2: # second arg (classification or regression)
+    classification_only = str(sys.argv[1]) == 'classification'
+
 data_dir = '/scratch/users/vision/data/pmlb'
-out_dir = '/scratch/users/vision/chandan/pmlb'
+out_dir = '/scratch/users/vision/chandan/pmlb/test'
 random_state = 42 # for each train_test_split
 
-results = pd.DataFrame(pkl.load(open(oj(out_dir, 'classification_results_orig_seeded.pkl'), 'rb')))
-os.makedirs(out_dir, exist_ok=True)
+# results = pd.DataFrame(pkl.load(open(oj(out_dir, 'classification_results_orig_seeded.pkl'), 'rb')))
 
-def fit_altered(data_dir, out_dir, dset_num=0, random_state=42):
+def fit_altered(data_dir, out_dir, dset_name=0, classification_only=True, random_state=42):
 
-    r = results
-    print('results shape', r.shape)
+#     r = results
+#     print('results shape', r.shape)
 
 
     score_results = {
@@ -47,19 +48,45 @@ def fit_altered(data_dir, out_dir, dset_num=0, random_state=42):
             'variances': [],
             'logit_score_altered_interaction_onevar': [],    
             'logit_score_altered_interaction_append': [],
+            'logit_test_score': [],
+            'rf_test_score': [],
+            'rf': [],
+            'dset_name': [dset_name],
+            'classification_only': [classification_only],
         }
 
-#     for dset_num in tqdm(range(results.shape[0])): #tqdm(range(2)): #range(r.shape[0]):
+    # fit basic things
+    if classification_only:
+        logit = LogisticRegression(solver='liblinear', multi_class='auto', random_state=random_state) # liblinear best for small dsets, otherwise lbfgs
+        rf = RandomForestClassifier(n_estimators=100, random_state=random_state)
+    else:
+        logit = LinearRegression(normalize=True)
+        rf = RandomForestRegressor(n_estimators=100, random_state=random_state)
 
     # load data and rf
-    row = r.iloc[dset_num]    
-    dset_name = row.dset_name # results['dset_names'][idx_0] #dsets.classification_dataset_names[0]
+#     row = r.iloc[dset_num]    
+#      = row.dset_name # results['dset_names'][idx_0] #dsets.classification_dataset_names[0]
     X, y = dsets.fetch_data(dset_name, return_X_y=True, 
                       local_cache_dir=data_dir)
     train_X, test_X, train_y, test_y = train_test_split(X, y, random_state=random_state)
+    
+    logit.fit(train_X, train_y)
+    rf.fit(train_X, train_y)
+
+    
+    pred = logit.predict(test_X)
+    print(pred.shape, test_y.shape)
+    print(accuracy_score(pred, test_y))
+    
+    score_results['logit_test_score'].append(logit.score(test_X, test_y))
+    score_results['rf_test_score'].append(rf.score(test_X, test_y))    
+    
+    print('logit score', logit.score(test_X, test_y))
+    
     num_features = X.shape[1]
-    rf = row.rf
-    assert(rf.score(test_X, test_y) == row.rf_test_score) # check that acc matches
+    score_results['rf'].append(rf)
+#     rf = row.rf
+#     assert(rf.score(test_X, test_y) == row.rf_test_score) # check that acc matches
 
 
     # feature importances
@@ -146,9 +173,10 @@ def fit_altered(data_dir, out_dir, dset_num=0, random_state=42):
     # saving
 #     scores_df = pd.DataFrame(score_results)
 #     full_results = pd.concat([results.iloc[list(range(dset_num + 1))], scores_df], axis=1)
-    full_results = {**results.iloc[dset_num].to_dict(), **score_results}
-    out_str = f'rerun_single_full_results_{dset_num}_full'
-    pkl.dump(full_results, open(oj(out_dir, out_str + '.pkl'), 'wb'))
+    os.makedirs(out_dir, exist_ok=True)
+#     full_results = {**results.iloc[dset_num].to_dict(), **score_results}
+    out_str = f'{dset_name}_full'
+    pkl.dump(score_results, open(oj(out_dir, out_str + '.pkl'), 'wb'))
 
-fit_altered(data_dir, out_dir, dset_num=dset_num, random_state=42)
+fit_altered(data_dir, out_dir, dset_name, classification_only, random_state=42)
 print('success!')
