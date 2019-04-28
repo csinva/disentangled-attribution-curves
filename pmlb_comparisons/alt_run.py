@@ -20,23 +20,19 @@ from sklearn.metrics import accuracy_score
 import interactions
 from scipy import interpolate
 
-dset_name = 'analcatdata_aids'
-classification_only = False
+# dset_name = 'analcatdata_aids'
+dset_name = 'analcatdata_germangss' # check for multiclass
+classification_only = True
 if len(sys.argv) > 1: # first arg (the dset_name)
     dset_name = str(sys.argv[1])
 if len(sys.argv) > 2: # second arg (classification or regression)
     classification_only = str(sys.argv[1]) == 'classification'
 
 data_dir = '/scratch/users/vision/data/pmlb'
-out_dir = '/scratch/users/vision/chandan/pmlb/test'
+out_dir = '/scratch/users/vision/chandan/pmlb/new'
 random_state = 42 # for each train_test_split
 
-# results = pd.DataFrame(pkl.load(open(oj(out_dir, 'classification_results_orig_seeded.pkl'), 'rb')))
-
 def fit_altered(data_dir, out_dir, dset_name=0, classification_only=True, random_state=42):
-
-#     r = results
-#     print('results shape', r.shape)
 
 
     score_results = {
@@ -57,7 +53,9 @@ def fit_altered(data_dir, out_dir, dset_name=0, classification_only=True, random
 
     # fit basic things
     if classification_only:
-        logit = LogisticRegression(solver='liblinear', multi_class='auto', random_state=random_state) # liblinear best for small dsets, otherwise lbfgs
+        # logit = LogisticRegression(solver='liblinear', multi_class='auto', random_state=random_state) # liblinear best for small dsets, otherwise lbfgs
+        logit = LogisticRegression(solver='lbfgs',
+                         multi_class='multinomial')
         rf = RandomForestClassifier(n_estimators=100, random_state=random_state)
     else:
         logit = LinearRegression(normalize=True)
@@ -69,19 +67,12 @@ def fit_altered(data_dir, out_dir, dset_name=0, classification_only=True, random
     X, y = dsets.fetch_data(dset_name, return_X_y=True, 
                       local_cache_dir=data_dir)
     train_X, test_X, train_y, test_y = train_test_split(X, y, random_state=random_state)
-    
-    logit.fit(train_X, train_y)
-    rf.fit(train_X, train_y)
-
-    
-    pred = logit.predict(test_X)
-    print(pred.shape, test_y.shape)
-    print(accuracy_score(pred, test_y))
+    logit = logit.fit(train_X, train_y)
+    rf = rf.fit(train_X, train_y)
     
     score_results['logit_test_score'].append(logit.score(test_X, test_y))
     score_results['rf_test_score'].append(rf.score(test_X, test_y))    
     
-    print('logit score', logit.score(test_X, test_y))
     
     num_features = X.shape[1]
     score_results['rf'].append(rf)
