@@ -147,7 +147,7 @@ def fit_altered(data_dir, out_dir, dset_num=0, random_state=42):
 #     scores_df = pd.DataFrame(score_results)
 #     full_results = pd.concat([results.iloc[list(range(dset_num + 1))], scores_df], axis=1)
     full_results = {**results.iloc[dset_num].to_dict(), **score_results}
-    out_str = f'single_full_results_{dset_num}_full'
+    out_str = f'rerun_single_full_results_{dset_num}_full'
     pkl.dump(full_results, open(oj(out_dir, out_str + '.pkl'), 'wb'))
 
 fit_altered(data_dir, out_dir, dset_num=dset_num, random_state=42)
