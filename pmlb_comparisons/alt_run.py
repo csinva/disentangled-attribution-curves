@@ -29,7 +29,7 @@ if len(sys.argv) > 2: # second arg (classification or regression)
     classification_only = str(sys.argv[1]) == 'classification'
 
 data_dir = '/scratch/users/vision/data/pmlb'
-out_dir = '/scratch/users/vision/chandan/pmlb/regression_rerun'
+out_dir = '/scratch/users/vision/chandan/pmlb/regression_3'
 random_state = 42 # for each train_test_split
 
 def get_lin(classification_only, random_state):
@@ -39,7 +39,8 @@ def get_lin(classification_only, random_state):
         return LinearRegression(normalize=True)
 
 def fit_altered(data_dir, out_dir, dset_name, classification_only=True, random_state=42):
-
+    print(dset_name, 'classification:', classification_only)
+    continuous_y = False
 
     score_results = {
             'feature_scores_mdi': [],
@@ -105,9 +106,9 @@ def fit_altered(data_dir, out_dir, dset_name, classification_only=True, random_s
 #     x_axis, scores_on_spaced_line = single_var_grid_scores_and_plot(rf, train_X, train_y, S, (feat_val_min, feat_val_max), plot=False)
 #     f = interpolate.interp1d(x_axis, scores_on_spaced_line, kind='nearest') # function to interpolate the scores
     X_alt_train = interactions.interactions_forest(forest=rf, input_space_x=train_X, outcome_space_y=train_y, 
-                                             assignment=train_X, S=S, continuous_y=not classification_only).reshape(-1, 1)
+                                             assignment=train_X, S=S, continuous_y=continuous_y).reshape(-1, 1)
     X_alt_test = interactions.interactions_forest(forest=rf, input_space_x=train_X, outcome_space_y=train_y, 
-                                             assignment=test_X, S=S, continuous_y=not classification_only).reshape(-1, 1)
+                                             assignment=test_X, S=S, continuous_y=continuous_y).reshape(-1, 1)
 
 
 
@@ -135,7 +136,7 @@ def fit_altered(data_dir, out_dir, dset_name, classification_only=True, random_s
             S[feat_num]= 1
             S[i] = 1
         variances[i] = interactions.variance2D(forest=rf, X=train_X, y=train_y, S=S, 
-                                               intervals='auto', dis='auto', continuous_y=not classification_only)
+                                               intervals='auto', dis='auto', continuous_y=continuous_y)
     score_results['variances'].append(variances)
     '''
     score_results['variances'].append(np.nan)
@@ -148,15 +149,20 @@ def fit_altered(data_dir, out_dir, dset_name, classification_only=True, random_s
     S[feat_num_2] = 1
 
     X_interaction_train = interactions.interactions_forest(forest=rf, input_space_x=train_X, outcome_space_y=train_y, 
-                                             assignment=train_X, S=S, continuous_y=not classification_only).reshape(-1, 1)
+                                             assignment=train_X, S=S, continuous_y=continuous_y).reshape(-1, 1)
     X_interaction_test = interactions.interactions_forest(forest=rf, input_space_x=train_X, outcome_space_y=train_y, 
-                                             assignment=test_X, S=S, continuous_y=not classification_only).reshape(-1, 1)
+                                             assignment=test_X, S=S, continuous_y=continuous_y).reshape(-1, 1)
 
 
     # fit only on one interaction altered
     logit = get_lin(classification_only, random_state)
-    logit.fit(X_interaction_train, train_y)
-    score_results['logit_score_altered_interaction_onevar'].append(logit.score(X_interaction_test, test_y))
+    print('\tprerror', dset_name, 'shapes', X_interaction_train.shape, X_interaction_test.shape, train_y.shape, test_y.shape)
+    try:
+        logit.fit(X_interaction_train, train_y)
+        score_results['logit_score_altered_interaction_onevar'].append(logit.score(X_interaction_test, test_y))
+    except:
+        print('\terr!', dset_name, 'shapes', X_interaction_train.shape, X_interaction_test.shape, train_y.shape, test_y.shape)
+        exit(0)
 
      # fit with altered interaction (appended)
     logit = get_lin(classification_only, random_state)
