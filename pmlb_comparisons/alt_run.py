@@ -29,10 +29,16 @@ if len(sys.argv) > 2: # second arg (classification or regression)
     classification_only = str(sys.argv[1]) == 'classification'
 
 data_dir = '/scratch/users/vision/data/pmlb'
-out_dir = '/scratch/users/vision/chandan/pmlb/new'
+out_dir = '/scratch/users/vision/chandan/pmlb/regression_rerun'
 random_state = 42 # for each train_test_split
 
-def fit_altered(data_dir, out_dir, dset_name=0, classification_only=True, random_state=42):
+def get_lin(classification_only, random_state):
+    if classification_only:
+        return LogisticRegression(solver='lbfgs', multi_class='auto', random_state=random_state)
+    else:
+        return LinearRegression(normalize=True)
+
+def fit_altered(data_dir, out_dir, dset_name, classification_only=True, random_state=42):
 
 
     score_results = {
@@ -53,13 +59,10 @@ def fit_altered(data_dir, out_dir, dset_name=0, classification_only=True, random
 
     # fit basic things
     if classification_only:
-        # logit = LogisticRegression(solver='liblinear', multi_class='auto', random_state=random_state) # liblinear best for small dsets, otherwise lbfgs
-        logit = LogisticRegression(solver='lbfgs',
-                         multi_class='multinomial')
         rf = RandomForestClassifier(n_estimators=100, random_state=random_state)
     else:
-        logit = LinearRegression(normalize=True)
         rf = RandomForestRegressor(n_estimators=100, random_state=random_state)
+    logit = get_lin(classification_only, random_state)
 
     # load data and rf
 #     row = r.iloc[dset_num]    
@@ -102,24 +105,24 @@ def fit_altered(data_dir, out_dir, dset_name=0, classification_only=True, random
 #     x_axis, scores_on_spaced_line = single_var_grid_scores_and_plot(rf, train_X, train_y, S, (feat_val_min, feat_val_max), plot=False)
 #     f = interpolate.interp1d(x_axis, scores_on_spaced_line, kind='nearest') # function to interpolate the scores
     X_alt_train = interactions.interactions_forest(forest=rf, input_space_x=train_X, outcome_space_y=train_y, 
-                                             assignment=train_X, S=S, continuous_y=False).reshape(-1, 1)
+                                             assignment=train_X, S=S, continuous_y=not classification_only).reshape(-1, 1)
     X_alt_test = interactions.interactions_forest(forest=rf, input_space_x=train_X, outcome_space_y=train_y, 
-                                             assignment=test_X, S=S, continuous_y=False).reshape(-1, 1)
+                                             assignment=test_X, S=S, continuous_y=not classification_only).reshape(-1, 1)
 
 
 
     # fit only on one feature orig
-    logit = LogisticRegression(solver='liblinear', multi_class='auto', random_state=random_state) # liblinear best for small dsets, otherwise lbfgs
+    logit = get_lin(classification_only, random_state)
     logit.fit(feat_vals_train, train_y)
     score_results['logit_score_orig_onevar'].append(logit.score(feat_vals_test, test_y))
 
     # fit only on one feature altered
-    logit = LogisticRegression(solver='liblinear', multi_class='auto', random_state=random_state) # liblinear best for small dsets, otherwise lbfgs
+    logit = get_lin(classification_only, random_state)
     logit.fit(X_alt_train, train_y)
     score_results['logit_score_altered_onevar'].append(logit.score(X_alt_test, test_y))
 
     # fit with altered feature (appended)
-    logit = LogisticRegression(solver='liblinear', multi_class='auto', random_state=random_state) # liblinear best for small dsets, otherwise lbfgs
+    logit = get_lin(classification_only, random_state)
     logit.fit(np.hstack((train_X, X_alt_train)), train_y)
     score_results['logit_score_altered_append'].append(logit.score(np.hstack((test_X, X_alt_test)), test_y))    
 
@@ -132,7 +135,7 @@ def fit_altered(data_dir, out_dir, dset_name=0, classification_only=True, random
             S[feat_num]= 1
             S[i] = 1
         variances[i] = interactions.variance2D(forest=rf, X=train_X, y=train_y, S=S, 
-                                               intervals='auto', dis='auto', continuous_y=False)
+                                               intervals='auto', dis='auto', continuous_y=not classification_only)
     score_results['variances'].append(variances)
     '''
     score_results['variances'].append(np.nan)
@@ -145,18 +148,18 @@ def fit_altered(data_dir, out_dir, dset_name=0, classification_only=True, random
     S[feat_num_2] = 1
 
     X_interaction_train = interactions.interactions_forest(forest=rf, input_space_x=train_X, outcome_space_y=train_y, 
-                                             assignment=train_X, S=S, continuous_y=False).reshape(-1, 1)
+                                             assignment=train_X, S=S, continuous_y=not classification_only).reshape(-1, 1)
     X_interaction_test = interactions.interactions_forest(forest=rf, input_space_x=train_X, outcome_space_y=train_y, 
-                                             assignment=test_X, S=S, continuous_y=False).reshape(-1, 1)
+                                             assignment=test_X, S=S, continuous_y=not classification_only).reshape(-1, 1)
 
 
     # fit only on one interaction altered
-    logit = LogisticRegression(solver='liblinear', multi_class='auto', random_state=random_state) # liblinear best for small dsets, otherwise lbfgs
+    logit = get_lin(classification_only, random_state)
     logit.fit(X_interaction_train, train_y)
     score_results['logit_score_altered_interaction_onevar'].append(logit.score(X_interaction_test, test_y))
 
      # fit with altered interaction (appended)
-    logit = LogisticRegression(solver='liblinear', multi_class='auto', random_state=random_state) # liblinear best for small dsets, otherwise lbfgs
+    logit = get_lin(classification_only, random_state)
     logit.fit(np.hstack((train_X, X_interaction_train)), train_y)
     score_results['logit_score_altered_interaction_append'].append(logit.score(np.hstack((test_X, X_interaction_test)), test_y))    
 
