@@ -112,6 +112,7 @@ def fast_interactions(model, input_space_x, outcome_space_y, assignment, S, cont
         return counts/len(masked_y)
 
 def interactions_set(model, input_space_x, outcome_space_y, assignment, S, continuous_y=True, class_id=1):
+    print(S)
     features = model.tree_.feature
     thresholds = model.tree_.threshold
     path = model.decision_path(assignment).indices
@@ -120,11 +121,13 @@ def interactions_set(model, input_space_x, outcome_space_y, assignment, S, conti
     features_used = features_used[remove_leaves]
     mask = S[features_used] == 1
     features_relevant = features_used[mask]
+    print("features used", features_relevant)
     if(len(features_relevant) == 0):
         return "never encountered relevant features"
     thresholds_used = thresholds[path]
     thresholds_used = thresholds_used[remove_leaves]
     thresholds_relevant = thresholds_used[mask]
+    print("thresholds", thresholds)
     geq_list = np.transpose(np.transpose(assignment)[features_relevant]) >= thresholds_relevant
     input_greater = np.transpose(np.transpose(input_space_x)[features_relevant]) >= thresholds_relevant
     outputs = []
@@ -145,9 +148,21 @@ def interactions_forest(forest, input_space_x, outcome_space_y, assignment, S, c
     models = forest.estimators_
     avg = 0
     for model in models:
-        val = interactions_set(model, input_space_x, outcome_space_y, assignment, S, continuous_y=True, class_id=1)
+        val = interactions_set(model, input_space_x, outcome_space_y, assignment, S, continuous_y, class_id)
+        print(val)
         if val != "never encountered relevant features":
             avg += np.array(val)
+    return avg/len(models)
+
+def interactions_forest_sanity_check(forest, input_space_x, outcome_space_y, assignment, S, continuous_y=True, class_id=1):
+    models = forest.estimators_
+    avg = np.zeros(assignment.shape[0])
+    for model in models:
+        for i in range(assignment.shape[0]):
+            point = np.reshape(assignment[i, :], (1, -1))
+            val = fast_interactions(model, input_space_x, outcome_space_y, point, S, continuous_y, class_id)
+            if val != "never encountered relevant features":
+                avg[i] += val
     return avg/len(models)
 
 def fix_shape(distribution, unique_Y):
@@ -379,3 +394,28 @@ def aggregate_trees(trees, weights, input_space_x, outcome_space_y, assignment, 
         shaped = np.transpose(np.vstack((np.zeros(probs.shape[0]), probs)))
         weighted_average += w * shaped
     return weighted_average
+
+def conditional1D(X, y, S, x_rng, di):
+    curve = []
+    feature_relevant = np.nonzero(S)[0][0]
+    for bucket_start in x_rng:
+        bucket_end = bucket_start + di
+        mask = np.logical_and(X[:, feature_relevant] >= bucket_start, X[:, feature_relevant] < bucket_end)
+        curve.append(np.mean(y[mask]))
+    return np.array(curve)
+
+def conditional2D(X, y, S, x1_rng, x2_rng, di1, di2):
+    grid = np.zeros((len(x2_rng), len(x1_rng)))
+    f1 = np.nonzero(S)[0][0]
+    f2 = np.nonzero(S)[0][1]
+    for i in range(len(x2_rng)):
+        for j in range(len(x1_rng)):
+            b1_start = x1_rng[j]
+            b1_end = x1_rng[j] + di1
+            b2_start = x2_rng[i]
+            b2_end = x2_rng[i] + di2
+            mask1 = np.logical_and(X[:, f1] >= b1_start, X[:, f1] < b1_end)
+            mask2 = np.logical_and(X[:, f2] >= b2_start, X[:, f2] < b2_end)
+            mask = np.logical_and(mask1, mask2)
+            grid[i, j] = np.mean(y[mask])
+    return grid
