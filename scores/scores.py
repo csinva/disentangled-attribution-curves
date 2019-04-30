@@ -19,7 +19,7 @@ def get_importance_scores(model, score_type='mdi', X=None, Y=None):
     if score_type == 'mdi':
         return model.feature_importances_
     elif score_type == 'mda':
-        return eli5.sklearn.PermutationImportance(model, random_state=1, n_iter=10).fit(X, Y).feature_importances_
+        return eli5.sklearn.PermutationImportance(model, random_state=42, n_iter=4).fit(X, Y).feature_importances_
     else:
         raise NotImplementedError(f'{score_type} not implemented')
 

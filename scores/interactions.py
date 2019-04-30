@@ -148,8 +148,7 @@ def interactions_forest(forest, input_space_x, outcome_space_y, assignment, S, c
     models = forest.estimators_
     avg = 0
     for model in models:
-        val = interactions_set(model, input_space_x, outcome_space_y, assignment, S, continuous_y, class_id)
-        print(val)
+        val = interactions_set(model, input_space_x, outcome_space_y, assignment, S, continuous_y=continuous_y, class_id=1)
         if val != "never encountered relevant features":
             avg += np.array(val)
     return avg/len(models)
@@ -370,6 +369,17 @@ def variance2D(forest, X, y, S, intervals, dis, continuous_y=True):
     nonzero = np.nonzero(S)[0]
     S1[nonzero[0]] = 1
     S2[nonzero[1]] = 1
+
+    if intervals == 'auto':
+        min0 = np.min(X[:, nonzero[0]])
+        max0 = np.max(X[:, nonzero[0]])
+        min1 = np.min(X[:, nonzero[1]])
+        max1 = np.max(X[:, nonzero[1]])
+        intervals = [(min0, max0), (min1, max1)]
+    if dis == 'auto': # 100 points between the bounds
+        dis = [(intervals[0][1] - intervals[0][0]) / 100, (intervals[1][1] - intervals[1][0]) / 100]
+
+
     for model in models:
         vals = traverse_all_paths(model, X, y, S, continuous_y)
         vals1 = traverse_all_paths(model, X, y, S1, continuous_y)
