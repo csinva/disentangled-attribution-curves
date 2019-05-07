@@ -205,7 +205,7 @@ def traverse_all_paths(model, input_space_x, outcome_space_y, S, continuous_y = 
     intervals = {}
     intervals[0] =[(- float('inf'), float('inf'))] * num_feats
     encounters = {}
-    encounters[0] = False
+    encounters[0] = 0
     leaves = []
     fringe = [0]
     while len(fringe) > 0:
@@ -221,7 +221,7 @@ def traverse_all_paths(model, input_space_x, outcome_space_y, S, continuous_y = 
             left_interval = intervals[curr_node]
             right_interval = intervals[curr_node]
             if(S[feat] == 1):
-                encounters[curr_node] = True
+                encounters[curr_node] += 1
                 left_data = apply_rule(X, Y, bound, feat, "less")
                 right_data = apply_rule(X, Y, bound, feat, "geq")
 
@@ -242,31 +242,49 @@ def traverse_all_paths(model, input_space_x, outcome_space_y, S, continuous_y = 
         for leaf in leaves:
             X, Y = datasets[leaf]
             inter = intervals[leaf]
-            average = np.average(Y)
-            if(encounters[leaf]):
-                values.append(inter + [average] + [len(Y)])
+            relevant_X = np.transpose(np.transpose(X)[S == 1])
+            #average = np.average(Y)
+            values.append(inter + [relevant_X, Y] + [encounters[leaf]])
         return values
     for leaf in leaves:
         X, Y = datasets[leaf]
         inter = intervals[leaf]
-        proportion = np.count_nonzero(Y == 1)/Y.shape[0]
-        if(encounters[leaf]):
-            values.append(inter + [proportion] + [len(Y)])
+        #proportion = np.count_nonzero(Y == 1)/Y.shape[0]
+        values.append(inter + [X, Y] + [encounters[leaf]])
     return values
 
-def fill_1d(line, counts, interval, val, count, rng, di):
+def fill_1d(line, counts, interval, inter_xs, inter_ys, C, rng, di):#(line, counts, interval, val, count, rng, di):
     lower_bound = max(interval[0], rng[0])
     lower_bound = min(lower_bound, rng[-1])
     upper_bound = min(interval[1], rng[-1])
     upper_bound = max(upper_bound, rng[0])
     start_index = np.nonzero(rng - lower_bound >= 0)[0][0]
     end_index = np.nonzero(rng - upper_bound >= 0)[0][0]
+    #print("interval", interval)
+    #print("rng", rng)
+    #print("di", di)
+    #print("start location =", rng[start_index], "end location =", rng[end_index])
     for i in range(start_index, end_index):
-        line[i] += count * val
-        counts[i] += count
+        x = rng[i]
+        #print("x", x)
+        #print("x values for this interval", inter_xs)
+        #print("y values for this interval", inter_ys)
+        #print("C", C)
+        mu = np.mean(inter_xs)
+        cstd = C * np.sqrt(1.0/len(inter_ys) * np.sum((inter_xs - mu) ** 2))
+        #print("standard dev", cstd/C)
+        #print("C * standard dev", cstd)
+        #print("absolute difference", np.abs(inter_xs - x))
+        #print("absolute difference less than stdev", np.abs(inter_xs - x) <= cstd)
+        weight = np.count_nonzero(np.abs(inter_xs - x) <= cstd)
+        #print("weight", weight)
+        line[i] += weight * np.mean(inter_ys)
+        counts[i] += weight
+        #line[i] += count * val
+        #counts[i] += count
     return
 
-def make_line(values, interval_x, di, S, ret_counts=False):
+def make_line(values, interval_x, di, S, C=.25, ret_counts=False):
     x_axis = np.arange(interval_x[0], interval_x[1] + di, di)
     line = np.zeros(x_axis.shape[0] - 1)
     counts = np.zeros(x_axis.shape[0] - 1)
@@ -274,8 +292,8 @@ def make_line(values, interval_x, di, S, ret_counts=False):
     ind = np.nonzero(S)[0][0]
     for v in values:
         x_inter = v[0:num_vars][ind]
-        val, count = v[num_vars:]
-        fill_1d(line, counts, x_inter, val, count, x_axis, di)
+        inter_xs, inter_ys, w = v[num_vars:]
+        fill_1d(line, counts, x_inter, inter_xs, inter_ys, C, x_axis, di)
     for i in range(len(counts)):
         if(counts[i] == 0):
             counts[i] = 1
@@ -325,24 +343,24 @@ def make_grid(values, interval_x, interval_y, di_x, di_y, S, ret_counts=False):
         return grid/counts, counts
     return grid/counts
 
-def make_curve(model, input_space_x, outcome_space_y, S, interval_x, di, continuous_y = False):
+def make_curve(model, input_space_x, outcome_space_y, S, interval_x, di, C = .25, continuous_y = True):
     vals = traverse_all_paths(model, input_space_x, outcome_space_y, S, continuous_y)
-    line = make_line(vals, interval_x, di, S)
+    line = make_line(vals, interval_x, di, S, C)
     return line
 
-def make_map(model, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, continuous_y = False):
+def make_map(model, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, continuous_y = True):
     vals = traverse_all_paths(model, input_space_x, outcome_space_y, S, continuous_y)
     grid = make_grid(vals, interval_x, interval_y, di_x, di_y, S)
     return grid
 
-def make_curve_forest(forest, input_space_x, outcome_space_y, S, interval_x, di, continuous_y = False):
+def make_curve_forest(forest, input_space_x, outcome_space_y, S, interval_x, di, C = .25, continuous_y = True):
     models = forest.estimators_
     final_curve = 0
     for model in models:
-        final_curve += make_curve(model, input_space_x, outcome_space_y, S, interval_x, di, continuous_y)
+        final_curve += make_curve(model, input_space_x, outcome_space_y, S, interval_x, di, C, continuous_y)
     return final_curve/len(models)
 
-def make_map_forest(forest, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, continuous_y = False):
+def make_map_forest(forest, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, continuous_y = True):
     models = forest.estimators_
     final_grid = 0
     for model in models:
