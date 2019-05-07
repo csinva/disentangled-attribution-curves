@@ -254,34 +254,20 @@ def traverse_all_paths(model, input_space_x, outcome_space_y, S, continuous_y = 
     return values
 
 def fill_1d(line, counts, interval, inter_xs, inter_ys, C, rng, di):#(line, counts, interval, val, count, rng, di):
-    lower_bound = max(interval[0], rng[0])
-    lower_bound = min(lower_bound, rng[-1])
-    upper_bound = min(interval[1], rng[-1])
-    upper_bound = max(upper_bound, rng[0])
-    start_index = np.nonzero(rng - lower_bound >= 0)[0][0]
-    end_index = np.nonzero(rng - upper_bound >= 0)[0][0]
-    #print("interval", interval)
-    #print("rng", rng)
-    #print("di", di)
-    #print("start location =", rng[start_index], "end location =", rng[end_index])
-    for i in range(start_index, end_index):
-        x = rng[i]
-        #print("x", x)
-        #print("x values for this interval", inter_xs)
-        #print("y values for this interval", inter_ys)
-        #print("C", C)
-        mu = np.mean(inter_xs)
-        cstd = C * np.sqrt(1.0/len(inter_ys) * np.sum((inter_xs - mu) ** 2))
-        #print("standard dev", cstd/C)
-        #print("C * standard dev", cstd)
-        #print("absolute difference", np.abs(inter_xs - x))
-        #print("absolute difference less than stdev", np.abs(inter_xs - x) <= cstd)
-        weight = np.count_nonzero(np.abs(inter_xs - x) <= cstd)
-        #print("weight", weight)
-        line[i] += weight * np.mean(inter_ys)
-        counts[i] += weight
-        #line[i] += count * val
-        #counts[i] += count
+    lower_bound = int(np.round((max(interval[0], rng[0]) - rng[0])/di))
+    upper_bound = int(np.round((min(interval[1], rng[-1]) - rng[0])/di))
+    mu = np.mean(inter_xs)
+    cstd = C * np.sqrt(1.0/len(inter_ys) * np.sum((inter_xs - mu) ** 2))
+    weights = Counter(np.zeros(counts.shape))
+    val = np.mean(inter_ys)
+    cstd_step = int(np.round(cstd/di))
+    for x in inter_xs:
+        center = int(np.round((x - rng[0])/di))
+        lower = max(lower_bound, center - cstd_step)
+        upper = min(upper_bound, center + cstd_step)
+        weights[lower:upper] += 1
+    line += weights * val
+    counts += weights
     return
 
 def make_line(values, interval_x, di, S, C=.25, ret_counts=False):
@@ -356,8 +342,13 @@ def make_map(model, input_space_x, outcome_space_y, S, interval_x, interval_y, d
 def make_curve_forest(forest, input_space_x, outcome_space_y, S, interval_x, di, C = .25, continuous_y = True):
     models = forest.estimators_
     final_curve = 0
+    i = 0
+    total = len(models)
     for model in models:
+        print("starting model", i, "at", time.ctime())
         final_curve += make_curve(model, input_space_x, outcome_space_y, S, interval_x, di, C, continuous_y)
+        print("model", i, "of", total, "complete at", time.ctime())
+        i += 1
     return final_curve/len(models)
 
 def make_map_forest(forest, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, continuous_y = True):
