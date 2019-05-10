@@ -100,6 +100,11 @@ def fit_altered(data_dir, out_dir, dset_name, classification_only=True, random_s
     S[feat_num]= 1
     X_alt_train = interactions.interactions_forest(forest=rf, input_space_x=train_X, outcome_space_y=train_y, 
                                              assignment=train_X, S=S, continuous_y=continuous_y).reshape(-1, 1)
+#     X_alt_train = interactions.interactions_forest(forest=rf, input_space_x=train_X, outcome_space_y=train_y, 
+#                                              assignment=train_X, S=S, continuous_y=continuous_y).reshape(-1, 1)
+    make_curve_forest(forest, input_space_x, outcome_space_y, S, interval_x, di, C, continuous_y = True):
+
+    
     X_alt_test = interactions.interactions_forest(forest=rf, input_space_x=train_X, outcome_space_y=train_y, 
                                              assignment=test_X, S=S, continuous_y=continuous_y).reshape(-1, 1)
 
