@@ -2,6 +2,7 @@ import numpy as np
 import time
 import matplotlib.pyplot as plt
 from sklearn import tree
+from collections import Counter
 
 # from model_train import *
 import sys
@@ -146,15 +147,6 @@ def interactions_set(model, input_space_x, outcome_space_y, assignment, S, conti
 
 def interactions_forest(forest, input_space_x, outcome_space_y, assignment, S, continuous_y=True, class_id=1):
     models = forest.estimators_
-    avg = 0
-    for model in models:
-        val = interactions_set(model, input_space_x, outcome_space_y, assignment, S, continuous_y=continuous_y, class_id=1)
-        if val != "never encountered relevant features":
-            avg += np.array(val)
-    return avg/len(models)
-
-def interactions_forest_sanity_check(forest, input_space_x, outcome_space_y, assignment, S, continuous_y=True, class_id=1):
-    models = forest.estimators_
     avg = np.zeros(assignment.shape[0])
     for model in models:
         for i in range(assignment.shape[0]):
@@ -194,7 +186,7 @@ def apply_rule(X, Y, threshold, feature, direction):
 #The purpose of this function is to traverse each path from root to leaf in a tree
 #each leaf node will be associated with an set of intervals, one interval per feature specified in S, a value, and a count
 #of training points that fall into said intervals.
-def traverse_all_paths(model, input_space_x, outcome_space_y, S, continuous_y = False):
+def traverse_all_paths(model, input_space_x, outcome_space_y, S, C, continuous_y = False):
     children_left = model.tree_.children_left
     children_right = model.tree_.children_right
     feature = model.tree_.feature
@@ -238,39 +230,37 @@ def traverse_all_paths(model, input_space_x, outcome_space_y, S, continuous_y = 
         else:
             leaves.append(curr_node)
     values = []
-    if(continuous_y):
-        for leaf in leaves:
-            X, Y = datasets[leaf]
-            inter = intervals[leaf]
-            relevant_X = np.transpose(np.transpose(X)[S == 1])
-            #average = np.average(Y)
-            values.append(inter + [relevant_X, Y] + [encounters[leaf]])
-        return values
     for leaf in leaves:
         X, Y = datasets[leaf]
-        inter = intervals[leaf]
-        #proportion = np.count_nonzero(Y == 1)/Y.shape[0]
-        values.append(inter + [X, Y] + [encounters[leaf]])
+        inters = intervals[leaf]
+        relevant_X = np.transpose(np.transpose(X)[S == 1])
+        x_mu = np.mean(relevant_X, axis=0)
+        x_cstd = C * np.std(relevant_X, axis=0)
+        lower_mask = np.all(relevant_X >= x_mu - x_cstd, axis=1)
+        upper_mask = np.all(relevant_X <= x_mu + x_cstd, axis=1)
+        mask = np.logical_and(lower_mask, upper_mask)
+        mask = np.reshape(mask, Y.shape)
+        Y = Y[mask]
+        index = 0
+        for i in np.nonzero(S)[0]:
+            inters[i] = (x_mu[index] - x_cstd[index], x_mu[index] + x_cstd[index])
+            index += 1
+        if(continuous_y):
+            average = np.average(Y)
+            values.append(inters + [average, len(Y)])
+        else:
+            proportion = np.count_nonzero(Y == 1)/Y.shape[0]
+            values.append(inters + [proportion, len(Y)])
     return values
 
-def fill_1d(line, counts, interval, inter_xs, inter_ys, C, rng, di):#(line, counts, interval, val, count, rng, di):
+
+def fill_1d(line, counts, interval, val, weight, rng, di):
     lower_bound = int(np.round((max(interval[0], rng[0]) - rng[0])/di))
     upper_bound = int(np.round((min(interval[1], rng[-1]) - rng[0])/di))
-    mu = np.mean(inter_xs)
-    cstd = C * np.sqrt(1.0/len(inter_ys) * np.sum((inter_xs - mu) ** 2))
-    weights = Counter(np.zeros(counts.shape))
-    val = np.mean(inter_ys)
-    cstd_step = int(np.round(cstd/di))
-    for x in inter_xs:
-        center = int(np.round((x - rng[0])/di))
-        lower = max(lower_bound, center - cstd_step)
-        upper = min(upper_bound, center + cstd_step)
-        weights[lower:upper] += 1
-    line += weights * val
-    counts += weights
-    return
+    line[lower_bound:upper_bound] += val * weight
+    counts[lower_bound:upper_bound] += weight
 
-def make_line(values, interval_x, di, S, C=.25, ret_counts=False):
+def make_line(values, interval_x, di, S, ret_counts=False):
     x_axis = np.arange(interval_x[0], interval_x[1] + di, di)
     line = np.zeros(x_axis.shape[0] - 1)
     counts = np.zeros(x_axis.shape[0] - 1)
@@ -278,13 +268,31 @@ def make_line(values, interval_x, di, S, C=.25, ret_counts=False):
     ind = np.nonzero(S)[0][0]
     for v in values:
         x_inter = v[0:num_vars][ind]
-        inter_xs, inter_ys, w = v[num_vars:]
-        fill_1d(line, counts, x_inter, inter_xs, inter_ys, C, x_axis, di)
+        val, weight = v[num_vars:]
+        fill_1d(line, counts, x_inter, val, weight, x_axis, di)
     for i in range(len(counts)):
         if(counts[i] == 0):
-            counts[i] = 1
+            #print("no data at index", i)
+            div = 0
+            if(i - 1 >= 0):
+                div += 1
+                counts[i] += counts[i - 1]
+                line[i] += line[i - 1]
+                #print("lower neighbor is has un-normalized value", line[i-1], "weight", counts[i-1])
+            if(i + 1 < len(counts)):
+                div += 1
+                counts[i] += counts[i + 1]
+                line[i] += line[i + 1]
+                #print("upper neighbor is has un-normalized value", line[i+1], "weight", counts[i+1])
+            line[i] = line[i]/div
+            counts[i] = counts[i]/div
+            #print("setting value to", line[i])
+            #print("setting count to", counts[i])
+    #print("non-normalized values", line[0], line[-1])
+    #print("weights", counts[0], counts[-1])
     if(ret_counts):
         return line/counts, counts
+    #print("normalized values", (line/counts)[0], (line/counts)[-1])
     return line/counts
 
 def fill_2d(grid, counts, x_interval, y_interval, val, count, x_rng, y_rng, x_di, y_di):
@@ -329,9 +337,9 @@ def make_grid(values, interval_x, interval_y, di_x, di_y, S, ret_counts=False):
         return grid/counts, counts
     return grid/counts
 
-def make_curve(model, input_space_x, outcome_space_y, S, interval_x, di, C = .25, continuous_y = True):
-    vals = traverse_all_paths(model, input_space_x, outcome_space_y, S, continuous_y)
-    line = make_line(vals, interval_x, di, S, C)
+def make_curve(model, input_space_x, outcome_space_y, S, interval_x, di, C, continuous_y):
+    vals = traverse_all_paths(model, input_space_x, outcome_space_y, S, C, continuous_y)
+    line = make_line(vals, interval_x, di, S)
     return line
 
 def make_map(model, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, continuous_y = True):
@@ -339,15 +347,15 @@ def make_map(model, input_space_x, outcome_space_y, S, interval_x, interval_y, d
     grid = make_grid(vals, interval_x, interval_y, di_x, di_y, S)
     return grid
 
-def make_curve_forest(forest, input_space_x, outcome_space_y, S, interval_x, di, C = .25, continuous_y = True):
+def make_curve_forest(forest, input_space_x, outcome_space_y, S, interval_x, di, C, continuous_y = True):
     models = forest.estimators_
     final_curve = 0
     i = 0
     total = len(models)
     for model in models:
-        print("starting model", i, "at", time.ctime())
+        #print("starting model", i, "at", time.ctime())
         final_curve += make_curve(model, input_space_x, outcome_space_y, S, interval_x, di, C, continuous_y)
-        print("model", i, "of", total, "complete at", time.ctime())
+        #print("model", i, "of", total, "complete at", time.ctime())
         i += 1
     return final_curve/len(models)
 
