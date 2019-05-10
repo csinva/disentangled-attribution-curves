@@ -272,48 +272,30 @@ def make_line(values, interval_x, di, S, ret_counts=False):
         fill_1d(line, counts, x_inter, val, weight, x_axis, di)
     for i in range(len(counts)):
         if(counts[i] == 0):
-            #print("no data at index", i)
             div = 0
             if(i - 1 >= 0):
                 div += 1
                 counts[i] += counts[i - 1]
                 line[i] += line[i - 1]
-                #print("lower neighbor is has un-normalized value", line[i-1], "weight", counts[i-1])
             if(i + 1 < len(counts)):
                 div += 1
                 counts[i] += counts[i + 1]
                 line[i] += line[i + 1]
-                #print("upper neighbor is has un-normalized value", line[i+1], "weight", counts[i+1])
             line[i] = line[i]/div
             counts[i] = counts[i]/div
-            #print("setting value to", line[i])
-            #print("setting count to", counts[i])
-    #print("non-normalized values", line[0], line[-1])
-    #print("weights", counts[0], counts[-1])
     if(ret_counts):
         return line/counts, counts
-    #print("normalized values", (line/counts)[0], (line/counts)[-1])
     return line/counts
 
 def fill_2d(grid, counts, x_interval, y_interval, val, count, x_rng, y_rng, x_di, y_di):
-    x_lower_bound = max(x_interval[0], x_rng[0])
-    x_lower_bound = min(x_lower_bound, x_rng[-1])
-    x_upper_bound = min(x_interval[1], x_rng[-1])
-    x_upper_bound = max(x_upper_bound, x_rng[0])
-    x_start_index = np.nonzero(x_rng - x_lower_bound >= 0)[0][0]
-    x_end_index = np.nonzero(x_rng - x_upper_bound >= 0)[0][0]
+    x_lower_bound = int(np.round((max(x_interval[0], x_rng[0]) - x_rng[0])/x_di))
+    x_upper_bound = int(np.round((min(x_interval[1], x_rng[-1]) - x_rng[0])/x_di))
 
-    y_lower_bound = max(y_interval[0], y_rng[0])
-    y_lower_bound = min(y_lower_bound, y_rng[-1])
-    y_upper_bound = min(y_interval[1], y_rng[-1])
-    y_upper_bound = max(y_upper_bound, y_rng[0])
-    y_start_index = np.nonzero(y_rng - y_lower_bound >= 0)[0][0]
-    y_end_index = np.nonzero(y_rng - y_upper_bound >= 0)[0][0]
-    for y in range(y_start_index, y_end_index):
-        for x in range(x_start_index, x_end_index):
-            grid[y][x] += count * val
-            counts[y][x] += count
-    return
+    y_lower_bound = int(np.round((min(y_interval[0], y_rng[-0]) - y_rng[0])/y_di))
+    y_upper_bound = int(np.round((min(y_interval[1], y_rng[-1]) - y_rng[0])/y_di))
+
+    grid[y_lower_bound:y_upper_bound, x_lower_bound:x_upper_bound] += val * count
+    counts[y_lower_bound:y_upper_bound, x_lower_bound:x_upper_bound] += count
 
 def make_grid(values, interval_x, interval_y, di_x, di_y, S, ret_counts=False):
     x_rng = np.arange(interval_x[0], interval_x[1] + di_x, di_x)
