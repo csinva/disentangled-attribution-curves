@@ -19,8 +19,30 @@ import seaborn as sns
 def generate_y(X):
     if func_num == 1:
         y = np.power(np.pi, X[:, 0] * X[:, 1]) * np.sqrt(2 * np.abs(X[:, 2])) - np.arcsin(.5 * X[:, 3])
-#         y += np.log(np.abs(X[:, 2] + X[:, 4]) + 1) + X[:, 8]/(1 + np.abs(X[:, 9])) * np.sqrt(np.abs(X[:, 6])/(np.abs(X[:, 7]) + 1))
-#         y -= X[:, 1] * X[:, 6]
+        y += np.log(np.abs(X[:, 2] + X[:, 4]) + 1)
+    elif func_num == 2:
+        y = np.power(np.pi, X[:, 0] * X[:, 1]) * np.sqrt(2 * np.abs(X[:, 2])) - np.arcsin(.5 * X[:, 3])
+        y += np.log(np.abs(X[:, 2] + X[:, 4]) + 1) - X[:, 1] * X[:, 4]
+    elif func_num == 3:
+        y = np.exp(np.abs(X[:, 0] - X[:, 2])) + np.abs(X[:, 1] * X[:, 2]) - np.power(np.abs(X[:, 2]), 2 * np.abs(X[:, 3]))
+        y += np.log(X[:, 3] ** 2 + X[:, 4] ** 2)
+    elif func_num == 4:
+        y = np.exp(np.abs(X[:, 0] - X[:, 2])) + np.abs(X[:, 1] * X[:, 2]) - np.power(np.abs(X[:, 2]), 2 * np.abs(X[:, 3]))
+        y += np.log(X[:, 3] ** 2 + X[:, 4] ** 2) + (X[:, 0] * X[:, 3]) ** 2
+    elif func_num == 5:
+        y = 1/(1 + X[:, 0] ** 2 + X[:, 1] ** 2 + X[:, 2] ** 2) + np.sqrt(np.exp(X[:, 3] + X[:, 4]))
+    elif func_num == 6:
+        y = np.exp(np.abs(X[:, 1] * X[:, 2] + 1)) - np.exp(np.abs(X[:, 2] + X[:, 4]) + 1) + np.cos(X[:, 4])
+    elif func_num == 7:
+        y = (np.arctan(X[:, 0]) + np.arctan(X[:, 1])) ** 2 + np.max(X[:, 2] * X[:, 3], 0)
+        y -= 1/(1 + (X[:, 3] * X[:, 4]) ** 2) + np.sum(X, axis=1)        
+    elif func_num == 8:
+        y = X[:, 0] * X[:, 1] + np.power(2, X[:, 2] + X[:, 4]) + np.power(2, X[:, 2] + X[:, 3] + X[:, 4])    
+    elif func_num == 9:
+        y = np.arctan(X[:, 0] * X[:, 1] + X[:, 2] * X[:, 3]) * np.sqrt(np.abs(X[:, 4]))
+        y += np.exp(X[:, 4] + X[:, 0])        
+    elif func_num == 10:
+        y = np.sinh(X[:, 0] + X[:, 1]) + np.arccos(np.arctan(X[:, 2] + X[:, 4])) + np.cos(X[:, 3] + X[:, 4])
     return y
 
 # get means and covariances
@@ -77,6 +99,7 @@ def calc_curves(X, y, df, num_vars, X_test, y_test, X_cond, y_cond, out_dir, fun
         curves_i['exp'] = exp
         curve = make_curve_forest(forest, X, y, S, (-1, 1), .01, C = 1, continuous_y = True)
         curves_i['dac'] = curve
+        feats = list(df.keys())
         pdp_xi = pdp.pdp_isolate(model=forest, dataset=df, model_features=feats, feature=feats[i], num_grid_points=200).pdp
         curves_i['pdp'] = pdp_xi
         curves[i] = deepcopy(curves_i)
@@ -95,7 +118,7 @@ if __name__ == '__main__':
     seed = 1
     np.random.seed(seed)
     num_vars = 5
-    out_dir = 'sim_results'
+    out_dir = '/accounts/projects/vision/chandan/rf_interactions/sim_comparisons/sim_results'
     means, covs = get_means_and_cov(num_vars)
     X, y, df = get_X_y(means, covs, num_points=70000)
     X_test, y_test, _ = get_X_y(means, covs, num_points=1000000)
