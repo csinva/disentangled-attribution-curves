@@ -257,8 +257,8 @@ def traverse_all_paths(model, input_space_x, outcome_space_y, S, C, continuous_y
 def fill_1d(line, counts, interval, val, weight, rng, di):
     lower_bound = int(np.round((max(interval[0], rng[0]) - rng[0])/di))
     upper_bound = int(np.round((min(interval[1], rng[-1]) - rng[0])/di))
-    line[lower_bound:upper_bound] += val * weight
-    counts[lower_bound:upper_bound] += weight
+    line[lower_bound:upper_bound + 1] += val * weight
+    counts[lower_bound:upper_bound + 1] += weight
 
 def make_line(values, interval_x, di, S, ret_counts=False):
     x_axis = np.arange(interval_x[0], interval_x[1] + di, di)
@@ -294,8 +294,8 @@ def fill_2d(grid, counts, x_interval, y_interval, val, count, x_rng, y_rng, x_di
     y_lower_bound = int(np.round((min(y_interval[0], y_rng[-0]) - y_rng[0])/y_di))
     y_upper_bound = int(np.round((min(y_interval[1], y_rng[-1]) - y_rng[0])/y_di))
 
-    grid[y_lower_bound:y_upper_bound, x_lower_bound:x_upper_bound] += val * count
-    counts[y_lower_bound:y_upper_bound, x_lower_bound:x_upper_bound] += count
+    grid[y_lower_bound:y_upper_bound + 1, x_lower_bound:x_upper_bound + 1] += val * count
+    counts[y_lower_bound:y_upper_bound + 1, x_lower_bound:x_upper_bound + 1] += count
 
 def make_grid(values, interval_x, interval_y, di_x, di_y, S, ret_counts=False):
     x_rng = np.arange(interval_x[0], interval_x[1] + di_x, di_x)
