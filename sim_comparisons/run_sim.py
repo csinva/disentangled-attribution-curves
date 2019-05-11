@@ -70,7 +70,7 @@ def get_means_and_cov(num_vars, fix_eigs=False):
     return means, covs
 
 # get X and Y using means and covs
-def get_X_y(means, covs, num_points=70000):
+def get_X_y(means, covs, num_points=70000, use_rf=False, rf=None):
     X = np.random.multivariate_normal(means, covs, (num_points,))
     no_outliers = np.logical_and(np.all(X <= 2, axis=1), np.all(X >= -2, axis=1))
     # print(np.count_nonzero(no_outliers))
@@ -81,6 +81,9 @@ def get_X_y(means, covs, num_points=70000):
     # print(mask)
     X = X[~mask]
     y = y[~mask]
+    
+    if use_rf:
+        y = rf.predict(X)
 
     # put X into a dataframe
     feats = ["x" + str(i + 1) for i in range(means.size)]
@@ -98,7 +101,7 @@ def fit_model(X, y, X_test, y_test, out_dir, func_num):
     return forest, test_mse
 
 # calculate expectation, dac, and pdp curves
-def calc_curves(X, y, df, num_vars, X_test, y_test, X_cond, y_cond, out_dir, func_num):
+def calc_curves(X, y, df, num_vars, X_cond, y_cond, out_dir, func_num):
     print('calculating curves...')
     curves = {}
     for i in tqdm(range(num_vars)):
@@ -107,7 +110,7 @@ def calc_curves(X, y, df, num_vars, X_test, y_test, X_cond, y_cond, out_dir, fun
         S[i] = 1
         exp = conditional1D(X_cond, y_cond, S, np.arange(-1, 1, .01), .01)
         curves_i['exp'] = exp
-        curve = make_curve_forest(forest, X, y, S, (-1, 1), .01, C=1, continuous_y = True)
+        curve = make_curve_forest(forest, X, y, S, (-1, 1), .01, C=C, continuous_y = True)
         curves_i['dac'] = curve
         feats = list(df.keys())
         pdp_xi = pdp.pdp_isolate(model=forest, dataset=df, model_features=feats, feature=feats[i], num_grid_points=200).pdp
@@ -118,28 +121,38 @@ def calc_curves(X, y, df, num_vars, X_test, y_test, X_cond, y_cond, out_dir, fun
     
 if __name__ == '__main__':
     
-    # pick the func num
+    # hyperparams
     func_num = 1
+    seed = 1
+    n_train = 70000 # 70000
+    num_vars = 5
+    out_dir = '/scratch/users/vision/chandan/rf_sims/rf_fix_cov' # sim_results_fix_cov_C=0.25''
+    use_rf = True
+    fix_eigs = True # False, True, 'iid'
+    C = 1
+    
+    
+    # func_num sys argv
     if len(sys.argv) > 1: # first arg (the func_num)
         func_num = int(sys.argv[1])
-    print('func num', func_num)
+    print('func num', func_num)    
     
     # generate data
-    seed = 1
     np.random.seed(seed)
-    num_vars = 5
-    out_dir = '/accounts/projects/vision/chandan/rf_interactions/sim_comparisons/sim_results_fix_cov_C=0.25'
     os.makedirs(out_dir, exist_ok=True)
     means, covs = get_means_and_cov(num_vars, fix_eigs=True)
-    X, y, df = get_X_y(means, covs, num_points=70000) # 70000
+    X, y, df = get_X_y(means, covs, num_points=n_train) # 70000
     X_test, y_test, _ = get_X_y(means, covs, num_points=1000000)
-    X_cond, y_cond, _ = get_X_y(means, covs, num_points=15000000)
+    print(y_test.shape)
     
     # fit model
     forest, test_mse = fit_model(X, y, X_test, y_test, out_dir, func_num)
     pkl.dump({'rf': forest, 'test_mse': test_mse}, open(oj(out_dir, f'model_{func_num}.pkl'), 'wb'))
     
+    # generate data for conditional
+    X_cond, y_cond, _ = get_X_y(means, covs, num_points=15000000, use_rf=use_rf, rf=forest)
+    
     # calc curves
-    calc_curves(X, y, df, num_vars, X_test, y_test, X_cond, y_cond, out_dir, func_num)
+    calc_curves(X, y, df, num_vars, X_cond, y_cond, out_dir, func_num)
     print('done!')
     
