@@ -14,6 +14,7 @@ from os.path import join as oj
 from tqdm import tqdm
 import pickle as pkl
 import seaborn as sns
+import os
 
 # generates y (implicitly requires func_num)
 def generate_y(X):
@@ -46,15 +47,24 @@ def generate_y(X):
     return y
 
 # get means and covariances
-def get_means_and_cov(num_vars):
+def get_means_and_cov(num_vars, fix_eigs=False):
     means = np.zeros(num_vars)
     inv_sum = num_vars
-    eigs = []
-    while len(eigs) < num_vars - 1:
-        eig = np.random.uniform(0, inv_sum)
-        eigs.append(eig)
-        inv_sum -= eig
-    eigs.append(inv_sum)
+    if fix_eigs == 'iid':
+        eigs = [1] * num_vars    
+    elif fix_eigs == True:
+        if num_vars == 5:
+            eigs = [2, 2, 1, 0, 0]
+        elif num_vars == 10:
+            eigs = [4, 3, 2, 1, 0, 0, 0, 0, 0, 0]
+            print(np.sum(eigs))
+    else:
+        eigs = []
+        while len(eigs) < num_vars - 1:
+            eig = np.random.uniform(0, inv_sum)
+            eigs.append(eig)
+            inv_sum -= eig
+        eigs.append(inv_sum)
     covs = random_correlation.rvs(eigs)
     covs = random_correlation.rvs(eigs)
     return means, covs
@@ -97,7 +107,7 @@ def calc_curves(X, y, df, num_vars, X_test, y_test, X_cond, y_cond, out_dir, fun
         S[i] = 1
         exp = conditional1D(X_cond, y_cond, S, np.arange(-1, 1, .01), .01)
         curves_i['exp'] = exp
-        curve = make_curve_forest(forest, X, y, S, (-1, 1), .01, C = 1, continuous_y = True)
+        curve = make_curve_forest(forest, X, y, S, (-1, 1), .01, C=1, continuous_y = True)
         curves_i['dac'] = curve
         feats = list(df.keys())
         pdp_xi = pdp.pdp_isolate(model=forest, dataset=df, model_features=feats, feature=feats[i], num_grid_points=200).pdp
@@ -118,9 +128,10 @@ if __name__ == '__main__':
     seed = 1
     np.random.seed(seed)
     num_vars = 5
-    out_dir = '/accounts/projects/vision/chandan/rf_interactions/sim_comparisons/sim_results'
-    means, covs = get_means_and_cov(num_vars)
-    X, y, df = get_X_y(means, covs, num_points=70000)
+    out_dir = '/accounts/projects/vision/chandan/rf_interactions/sim_comparisons/sim_results_fix_cov_C=0.25'
+    os.makedirs(out_dir, exist_ok=True)
+    means, covs = get_means_and_cov(num_vars, fix_eigs=True)
+    X, y, df = get_X_y(means, covs, num_points=70000) # 70000
     X_test, y_test, _ = get_X_y(means, covs, num_points=1000000)
     X_cond, y_cond, _ = get_X_y(means, covs, num_points=15000000)
     
