@@ -92,7 +92,7 @@ def get_X_y(means, covs, num_points=70000, use_rf=False, rf=None):
     return X, y, df
 
 # fit an rf
-def fit_model(X, y, X_test, y_test, out_dir, func_num):
+def fit_model(X, y, X_test, y_test):
     print('fitting model...')
     forest = RandomForestRegressor(n_estimators=50)
     forest.fit(X, y)
@@ -101,7 +101,8 @@ def fit_model(X, y, X_test, y_test, out_dir, func_num):
     return forest, test_mse
 
 # calculate expectation, dac, and pdp curves
-def calc_curves(X, y, df, num_vars, X_cond, y_cond, out_dir, func_num):
+def calc_curves(X, y, df, X_cond, y_cond, forest, out_dir, func_num, C):
+    num_vars = X.shape[1]
     print('calculating curves...')
     curves = {}
     for i in tqdm(range(num_vars)):
@@ -110,6 +111,9 @@ def calc_curves(X, y, df, num_vars, X_cond, y_cond, out_dir, func_num):
         S[i] = 1
         exp = conditional1D(X_cond, y_cond, S, np.arange(-1, 1, .01), .01)
         curves_i['exp'] = exp
+#         exp_train = conditional1D(X, y, S, np.arange(-1, 1, .01), .01)
+#         curves_i['exp_train'] = exp_train
+        
         curve = make_curve_forest(forest, X, y, S, (-1, 1), .01, C=C, continuous_y = True)
         curves_i['dac'] = curve
         feats = list(df.keys())
@@ -126,10 +130,10 @@ if __name__ == '__main__':
     seed = 1
     n_train = 70000 # 70000
     num_vars = 5
-    out_dir = '/scratch/users/vision/chandan/rf_sims/rf_fix_cov' # sim_results_fix_cov_C=0.25''
+    out_dir = '/scratch/users/vision/chandan/rf_sims/rf_fix_cov_C=0.1' # sim_results_fix_cov_C=0.25''
     use_rf = True
     fix_eigs = True # False, True, 'iid'
-    C = 1
+    C = 0.1
     
     
     # func_num sys argv
@@ -146,13 +150,13 @@ if __name__ == '__main__':
     print(y_test.shape)
     
     # fit model
-    forest, test_mse = fit_model(X, y, X_test, y_test, out_dir, func_num)
+    forest, test_mse = fit_model(X, y, X_test, y_test)
     pkl.dump({'rf': forest, 'test_mse': test_mse}, open(oj(out_dir, f'model_{func_num}.pkl'), 'wb'))
     
     # generate data for conditional
     X_cond, y_cond, _ = get_X_y(means, covs, num_points=15000000, use_rf=use_rf, rf=forest)
     
     # calc curves
-    calc_curves(X, y, df, num_vars, X_cond, y_cond, out_dir, func_num)
+    calc_curves(X, y, df, X_cond, y_cond, forest, out_dir, func_num, C)
     print('done!')
     

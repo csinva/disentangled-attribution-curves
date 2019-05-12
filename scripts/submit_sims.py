@@ -2,7 +2,7 @@ import itertools
 from slurmpy import Slurm
 import pmlb as dsets
 
-partition = 'high'
+partition = 'low'
 func_nums = range(1, 11)
 # seeds = range(1)
 
