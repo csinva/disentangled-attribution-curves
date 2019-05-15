@@ -1,11 +1,11 @@
 import numpy as np
 from itertools import combinations
 from sklearn.tree import DecisionTreeRegressor
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 import matplotlib.pyplot as plt
 import sys
-sys.path.append('../scores')
-from interactions import *
+sys.path.append('../../dac')
+from dac import *
 from pdpbox import pdp
 import pandas as pd
 from scipy.stats import random_correlation
@@ -92,9 +92,12 @@ def get_X_y(means, covs, num_points=70000, use_rf=False, rf=None):
     return X, y, df
 
 # fit an rf
-def fit_model(X, y, X_test, y_test):
+def fit_model(X, y, X_test, y_test, rf_or_boosting):
     print('fitting model...')
-    forest = RandomForestRegressor(n_estimators=50)
+    if rf_or_boosting == 'rf':
+        forest = RandomForestRegressor(n_estimators=50)
+    elif rf_or_boosting == 'boosting':
+        forest = GradientBoostingRegressor(n_estimators=50)
     forest.fit(X, y)
     preds = forest.predict(X_test)
     test_mse = np.mean((y_test - preds) ** 2)
@@ -130,10 +133,11 @@ if __name__ == '__main__':
     seed = 1
     n_train = 70000 # 70000
     num_vars = 5
-    out_dir = '/scratch/users/vision/chandan/rf_sims/rf_fix_cov_C=0.1' # sim_results_fix_cov_C=0.25''
-    use_rf = True
+    out_dir = '/scratch/users/vision/chandan/rf_sims/test' # sim_results_fix_cov_C=0.25''
+    rf_or_boosting = 'boosting' # 'rf', 'boosting'
+    use_rf = False
     fix_eigs = True # False, True, 'iid'
-    C = 0.1
+    C = 1
     
     
     # func_num sys argv
@@ -150,7 +154,7 @@ if __name__ == '__main__':
     print(y_test.shape)
     
     # fit model
-    forest, test_mse = fit_model(X, y, X_test, y_test)
+    forest, test_mse = fit_model(X, y, X_test, y_test, rf_or_boosting)
     pkl.dump({'rf': forest, 'test_mse': test_mse}, open(oj(out_dir, f'model_{func_num}.pkl'), 'wb'))
     
     # generate data for conditional
