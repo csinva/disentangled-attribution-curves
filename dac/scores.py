@@ -22,19 +22,3 @@ def get_importance_scores(model, score_type='mdi', X=None, Y=None):
         return eli5.sklearn.PermutationImportance(model, random_state=42, n_iter=4).fit(X, Y).feature_importances_
     else:
         raise NotImplementedError(f'{score_type} not implemented')
-
-
-# arg1 -  train_x: N x p
-# arg2 - train_y: N x 1
-# returns: list of tuples of idxs ranking how important each of the pairwise interactions are - each in the range [0, p)
-def rank_pairwise_interactions(train_X, train_y):
-    raise NotImplementedError
-
-# arg1 -  train_x: N x p
-# arg2 -  test_X: N x p
-# arg3 - train_y: N x 1
-# arg4 - test_y: N x 1
-# idxs - list of either individual features or pairs of features to add to the logistic regression
-# returns: train + test accuracy after adding each of the idxs
-def add_features_and_train_logistic(train_X, test_X, train_y, test_y, idxs):
-    raise NotImplementedError
