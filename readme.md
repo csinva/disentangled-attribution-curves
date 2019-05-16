@@ -18,4 +18,4 @@ Official code for using / reproducing DAC from the paper "Disentangled Attributi
 
 
 # todo before submitting
-- remove scripts, eda folders
+- remove scripts, eda folders, analyze nbs
