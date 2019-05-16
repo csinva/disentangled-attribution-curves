@@ -324,8 +324,8 @@ def make_curve(model, input_space_x, outcome_space_y, S, interval_x, di, C, cont
     line = make_line(vals, interval_x, di, S)
     return line
 
-def make_map(model, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, continuous_y = True):
-    vals = traverse_all_paths(model, input_space_x, outcome_space_y, S, continuous_y)
+def make_map(model, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, C, continuous_y = True):
+    vals = traverse_all_paths(model, input_space_x, outcome_space_y, S, C, continuous_y)
     grid = make_grid(vals, interval_x, interval_y, di_x, di_y, S)
     return grid
 
@@ -341,11 +341,11 @@ def make_curve_forest(forest, input_space_x, outcome_space_y, S, interval_x, di,
         i += 1
     return final_curve/len(models)
 
-def make_map_forest(forest, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, continuous_y = True):
+def make_map_forest(forest, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, C, continuous_y = True):
     models = forest.estimators_
     final_grid = 0
     for model in models:
-        final_grid += make_map(model, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, continuous_y)
+        final_grid += make_map(model, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, C, continuous_y)
     return final_grid/len(models)
 
 def variance1D(forest, X, y, S, interval_x, di_x, continuous_y=True):
