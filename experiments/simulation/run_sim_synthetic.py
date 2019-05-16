@@ -104,7 +104,7 @@ def fit_model(X, y, X_test, y_test, rf_or_boosting):
     return forest, test_mse
 
 # calculate expectation, dac, and pdp curves
-def calc_curves(X, y, df, X_cond, y_cond, forest, out_dir, func_num, C, rf_or_boosting):
+def calc_curves(X, y, df, X_cond, y_cond, forest, out_dir, func_num, C, rf_or_boosting, seed):
     num_vars = X.shape[1]
     print('calculating curves...')
     curves = {}
@@ -126,7 +126,7 @@ def calc_curves(X, y, df, X_cond, y_cond, forest, out_dir, func_num, C, rf_or_bo
         pdp_xi = pdp.pdp_isolate(model=forest, dataset=df, model_features=feats, feature=feats[i], num_grid_points=200).pdp
         curves_i['pdp'] = pdp_xi
         curves[i] = deepcopy(curves_i)
-        pkl.dump(curves, open(oj(out_dir, f'curves_1d_{func_num}.pkl'), 'wb'))
+        pkl.dump(curves, open(oj(out_dir, f'curves_1d_{func_num}_{seed}.pkl'), 'wb'))
     print("complete!")
     
 if __name__ == '__main__':
@@ -134,11 +134,11 @@ if __name__ == '__main__':
     # hyperparams
     func_num = 1
     seed = 1
-    n_train = 70000 # 70000
+    n_train = 10000 # 70000
     num_vars = 5
-    fix_eigs = False # False, True, 'iid'
-    out_dir = '/scratch/users/vision/chandan/boosting_no_rf/some_corr' # sim_results_fix_cov_C=0.25''
-    rf_or_boosting = 'boosting' # 'rf', 'boosting'
+    fix_eigs = 'iid' # False, True, 'iid'
+    out_dir = '/scratch/users/vision/chandan/boosting_no_rf/iid_stability' # sim_results_fix_cov_C=0.25''
+    rf_or_boosting = 'rf' # 'rf', 'boosting'
     use_rf = False
     C = 1
     
@@ -147,6 +147,10 @@ if __name__ == '__main__':
     if len(sys.argv) > 1: # first arg (the func_num)
         func_num = int(sys.argv[1])
     print('func num', func_num)    
+    
+    if len(sys.argv) > 2: # second arg (the seed)
+        seed = int(sys.argv[2])
+    print('seed num', seed)    
     
     # generate data
     np.random.seed(seed)
@@ -164,6 +168,6 @@ if __name__ == '__main__':
     X_cond, y_cond, _ = get_X_y(means, covs, num_points=15000000, use_rf=use_rf, rf=forest)
     
     # calc curves
-    calc_curves(X, y, df, X_cond, y_cond, forest, out_dir, func_num, C, rf_or_boosting)
+    calc_curves(X, y, df, X_cond, y_cond, forest, out_dir, func_num, C, rf_or_boosting, seed)
     print('done!')
     

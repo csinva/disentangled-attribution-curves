@@ -10,27 +10,28 @@ import pandas as pd
 from numpy import array as arr
 
 # sklearn models
-sys.path.append('../scores')
-import scores
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.naive_bayes import GaussianNB
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.metrics import accuracy_score
-import interactions
+import dac
 from scipy import interpolate
+import eli5
 
-# dset_name = 'analcatdata_aids'
-dset_name = 'analcatdata_germangss' # check for multiclass
-classification_only = True
-if len(sys.argv) > 1: # first arg (the dset_name)
-    dset_name = str(sys.argv[1])
-if len(sys.argv) > 2: # second arg (classification or regression)
-    classification_only = str(sys.argv[2]) == 'classification'
 
-data_dir = '/scratch/users/vision/data/pmlb'
-out_dir = '/scratch/users/vision/chandan/pmlb/classification_3'
-random_state = 42 # for each train_test_split
+# arg1 - trained rf
+# arg2 - type of importance ('mdi', 'mda', our_thing')
+# some methods (mda, our thing) require X and Y for calculating importance
+    # passing in training data / testing data have different implications
+# returns: np array of 1 score for each variable
+def get_importance_scores(model, score_type='mdi', X=None, Y=None):
+    if score_type == 'mdi':
+        return model.feature_importances_
+    elif score_type == 'mda':
+        return eli5.sklearn.PermutationImportance(model, random_state=42, n_iter=4).fit(X, Y).feature_importances_
+    else:
+        raise NotImplementedError(f'{score_type} not implemented')
 
 def get_lin(classification_only, random_state):
     if classification_only:
@@ -81,9 +82,9 @@ def fit_altered(data_dir, out_dir, dset_name, classification_only=True, random_s
 
 
     # feature importances
-    feature_scores_mdi = scores.get_importance_scores(rf, score_type='mdi', X=test_X, Y=test_y)
+    feature_scores_mdi = get_importance_scores(rf, score_type='mdi', X=test_X, Y=test_y)
     score_results['feature_scores_mdi'].append(feature_scores_mdi)
-    # feature_scores_mda = scores.get_importance_scores(rf, score_type='mda', X=test_X, Y=test_y)
+    # feature_scores_mda = get_importance_scores(rf, score_type='mda', X=test_X, Y=test_y)
     # score_results['feature_scores_mda'].append(feature_scores_mda)
 
 
@@ -98,14 +99,14 @@ def fit_altered(data_dir, out_dir, dset_name, classification_only=True, random_s
     # appropriate variable to get importance for
     S = np.zeros(num_features)
     S[feat_num]= 1
-    X_alt_train = interactions.interactions_forest(forest=rf, input_space_x=train_X, outcome_space_y=train_y, 
+    X_alt_train = dac.interactions_forest(forest=rf, input_space_x=train_X, outcome_space_y=train_y, 
                                              assignment=train_X, S=S, continuous_y=continuous_y).reshape(-1, 1)
 #     X_alt_train = interactions.interactions_forest(forest=rf, input_space_x=train_X, outcome_space_y=train_y, 
 #                                              assignment=train_X, S=S, continuous_y=continuous_y).reshape(-1, 1)
     make_curve_forest(forest, input_space_x, outcome_space_y, S, interval_x, di, C, continuous_y = True):
 
     
-    X_alt_test = interactions.interactions_forest(forest=rf, input_space_x=train_X, outcome_space_y=train_y, 
+    X_alt_test = dac.interactions_forest(forest=rf, input_space_x=train_X, outcome_space_y=train_y, 
                                              assignment=test_X, S=S, continuous_y=continuous_y).reshape(-1, 1)
 
 
@@ -133,7 +134,7 @@ def fit_altered(data_dir, out_dir, dset_name, classification_only=True, random_s
             S = np.zeros(num_features)
             S[feat_num]= 1
             S[i] = 1
-        variances[i] = interactions.variance2D(forest=rf, X=train_X, y=train_y, S=S, 
+        variances[i] = dac.variance2D(forest=rf, X=train_X, y=train_y, S=S, 
                                                intervals='auto', dis='auto', continuous_y=continuous_y)
     score_results['variances'].append(variances)
     '''
@@ -146,9 +147,9 @@ def fit_altered(data_dir, out_dir, dset_name, classification_only=True, random_s
     S[feat_num]= 1
     S[feat_num_2] = 1
 
-    X_interaction_train = interactions.interactions_forest(forest=rf, input_space_x=train_X, outcome_space_y=train_y, 
+    X_interaction_train = dac.interactions_forest(forest=rf, input_space_x=train_X, outcome_space_y=train_y, 
                                              assignment=train_X, S=S, continuous_y=continuous_y).reshape(-1, 1)
-    X_interaction_test = interactions.interactions_forest(forest=rf, input_space_x=train_X, outcome_space_y=train_y, 
+    X_interaction_test = dac.interactions_forest(forest=rf, input_space_x=train_X, outcome_space_y=train_y, 
                                              assignment=test_X, S=S, continuous_y=continuous_y).reshape(-1, 1)
 
 
@@ -173,5 +174,23 @@ def fit_altered(data_dir, out_dir, dset_name, classification_only=True, random_s
     out_str = f'{dset_name}_full'
     pkl.dump(score_results, open(oj(out_dir, out_str + '.pkl'), 'wb'))
 
-fit_altered(data_dir, out_dir, dset_name, classification_only, random_state=42)
-print('success!')
+    
+    
+    
+    
+if __name__ == '__main__':    
+        
+    # dset_name = 'analcatdata_aids'
+    dset_name = 'analcatdata_germangss' # check for multiclass
+    classification_only = True
+    if len(sys.argv) > 1: # first arg (the dset_name)
+        dset_name = str(sys.argv[1])
+    if len(sys.argv) > 2: # second arg (classification or regression)
+        classification_only = str(sys.argv[2]) == 'classification'
+
+    data_dir = '/scratch/users/vision/data/pmlb'
+    out_dir = '/scratch/users/vision/chandan/pmlb/classification_3'
+    random_state = 42 # for each train_test_split        
+        
+    fit_altered(data_dir, out_dir, dset_name, classification_only, random_state=42)
+    print('success!')
