@@ -1,10 +1,10 @@
 import numpy as np
 from itertools import combinations
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor
 import matplotlib.pyplot as plt
 import sys
 sys.path.append('../../dac')
+sys.path.append('../dac')
 from dac import *
 from pdpbox import pdp
 import pandas as pd
@@ -97,14 +97,14 @@ def fit_model(X, y, X_test, y_test, rf_or_boosting):
     if rf_or_boosting == 'rf':
         forest = RandomForestRegressor(n_estimators=50)
     elif rf_or_boosting == 'boosting':
-        forest = GradientBoostingRegressor(n_estimators=50)
+        forest = AdaBoostRegressor(n_estimators=50)
     forest.fit(X, y)
     preds = forest.predict(X_test)
     test_mse = np.mean((y_test - preds) ** 2)
     return forest, test_mse
 
 # calculate expectation, dac, and pdp curves
-def calc_curves(X, y, df, X_cond, y_cond, forest, out_dir, func_num, C):
+def calc_curves(X, y, df, X_cond, y_cond, forest, out_dir, func_num, C, rf_or_boosting):
     num_vars = X.shape[1]
     print('calculating curves...')
     curves = {}
@@ -116,8 +116,11 @@ def calc_curves(X, y, df, X_cond, y_cond, forest, out_dir, func_num, C):
         curves_i['exp'] = exp
 #         exp_train = conditional1D(X, y, S, np.arange(-1, 1, .01), .01)
 #         curves_i['exp_train'] = exp_train
-        
-        curve = make_curve_forest(forest, X, y, S, (-1, 1), .01, C=C, continuous_y = True)
+        if rf_or_boosting == 'rf':
+            curve = make_curve_forest(forest, X, y, S, (-1, 1), .01, C=C, continuous_y = True)
+        elif rf_or_boosting == 'boosting':
+            curve = ada_boosted_curve_forest(forest, X, y, S, (-1, 1), .01, C=C, continuous_y = True)
+            
         curves_i['dac'] = curve
         feats = list(df.keys())
         pdp_xi = pdp.pdp_isolate(model=forest, dataset=df, model_features=feats, feature=feats[i], num_grid_points=200).pdp
@@ -133,10 +136,10 @@ if __name__ == '__main__':
     seed = 1
     n_train = 70000 # 70000
     num_vars = 5
-    out_dir = '/scratch/users/vision/chandan/rf_sims/test' # sim_results_fix_cov_C=0.25''
+    fix_eigs = False # False, True, 'iid'
+    out_dir = '/scratch/users/vision/chandan/boosting_no_rf/some_corr' # sim_results_fix_cov_C=0.25''
     rf_or_boosting = 'boosting' # 'rf', 'boosting'
     use_rf = False
-    fix_eigs = True # False, True, 'iid'
     C = 1
     
     
@@ -161,6 +164,6 @@ if __name__ == '__main__':
     X_cond, y_cond, _ = get_X_y(means, covs, num_points=15000000, use_rf=use_rf, rf=forest)
     
     # calc curves
-    calc_curves(X, y, df, X_cond, y_cond, forest, out_dir, func_num, C)
+    calc_curves(X, y, df, X_cond, y_cond, forest, out_dir, func_num, C, rf_or_boosting)
     print('done!')
     

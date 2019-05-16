@@ -7,9 +7,9 @@ from collections import Counter
 # from model_train import *
 import sys
 sys.path.append('../data')
-# from data import *
-from intervals import *
-from piecewise import piecewise_average_1d
+#from data import *
+#from intervals import *
+#from piecewise import piecewise_average_1d
 
 """
 PARAMETERS
@@ -283,6 +283,8 @@ def make_line(values, interval_x, di, S, ret_counts=False):
                 line[i] += line[i + 1]
             line[i] = line[i]/div
             counts[i] = counts[i]/div
+            if(counts[i] == 0):
+                counts[i] = 1
     if(ret_counts):
         return line/counts, counts
     return line/counts
@@ -329,24 +331,39 @@ def make_map(model, input_space_x, outcome_space_y, S, interval_x, interval_y, d
     grid = make_grid(vals, interval_x, interval_y, di_x, di_y, S)
     return grid
 
-def make_curve_forest(forest, input_space_x, outcome_space_y, S, interval_x, di, C, continuous_y = True):
+def make_curve_forest(forest, input_space_x, outcome_space_y, S, interval_x, di, C, continuous_y = True, weights = None):
     models = forest.estimators_
     final_curve = 0
     i = 0
-    total = len(models)
-    for model in models:
+    if weights is None:
+        weights = np.ones(len(models))
+    for i in range(len(models)):
         #print("starting model", i, "at", time.ctime())
-        final_curve += make_curve(model, input_space_x, outcome_space_y, S, interval_x, di, C, continuous_y)
+        model = models[i]
+        w = weights[i]
+        final_curve += w * make_curve(model, input_space_x, outcome_space_y, S, interval_x, di, C, continuous_y)
         #print("model", i, "of", total, "complete at", time.ctime())
         i += 1
-    return final_curve/len(models)
+    return final_curve/np.sum(weights)
 
-def make_map_forest(forest, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, C, continuous_y = True):
+def make_map_forest(forest, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, C, continuous_y = True, weights = None):
     models = forest.estimators_
     final_grid = 0
-    for model in models:
-        final_grid += make_map(model, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, C, continuous_y)
-    return final_grid/len(models)
+    if weights is None:
+        weights = np.ones(len(models))
+    for i in range(len(models)):
+        model = models[i]
+        w = weights[i]
+        final_grid += w * make_map(model, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, C, continuous_y)
+    return final_grid/np.sum(weights)
+
+def ada_boosted_curve_forest(forest, input_space_x, outcome_space_y, S, interval_x, di, C, continuous_y = True):
+    ada_weights = forest.estimator_weights_
+    return make_curve_forest(forest, input_space_x, outcome_space_y, S, interval_x, di, C, continuous_y = True, weights = ada_weights)
+
+def ada_boosted_map_forest(forest, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, C, continuous_y = True):
+    ada_weights = forest.estimator_weights_
+    return make_map_forest(forest, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, C, continuous_y = True, weights = ada_weights)
 
 def variance1D(forest, X, y, S, interval_x, di_x, continuous_y=True):
     data_mean = np.mean(y)

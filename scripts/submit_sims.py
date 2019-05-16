@@ -11,6 +11,6 @@ s = Slurm("sim", {"partition": partition, "time": "3-0", "mem": "MaxMemPerNode"}
 
 # iterate
 for i in range(len(func_nums)):
-    param_str = 'module load python; python3 /accounts/projects/vision/chandan/rf_interactions/sim_comparisons/run_sim.py '
+    param_str = 'module load python; python3 /accounts/projects/vision/chandan/rf_interactions/experiments/simulation/run_sim_synthetic.py '
     param_str += str(func_nums[i])
     s.run(param_str)
