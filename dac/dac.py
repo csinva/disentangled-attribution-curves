@@ -29,6 +29,8 @@ def interactions(model, input_space_x, outcome_space_y, assignment, S):
     features = model.tree_.feature
     thresholds = model.tree_.threshold
     path = model.decision_path(assignment).indices
+    
+    # get all the decision rules
     decision_rules = [] #store decisions as tuples: (feature, threshold, 0 if > or 1 if <=)
     for i in path:
         feature_ind = features[i]
@@ -36,6 +38,9 @@ def interactions(model, input_space_x, outcome_space_y, assignment, S):
             threshold = thresholds[i]
             geq = assignment[0][feature_ind] >= threshold
             decision_rules.append((feature_ind, threshold, geq))
+            
+            
+    # find all the outcomes which comply with these rules
     outcomes = []
     for i in range(len(outcome_space_y)):
         complies = True
@@ -46,6 +51,8 @@ def interactions(model, input_space_x, outcome_space_y, assignment, S):
                 complies = complies and input_space_x[i][d[0]] < d[1]
         if complies:
             outcomes.append(outcome_space_y[i])
+            
+    # get outcomes
     unique, counts = np.unique(outcomes, return_counts = True)
     unique = np.reshape(unique, (-1, 1))
     probs = np.reshape(counts/len(outcomes), (-1, 1))

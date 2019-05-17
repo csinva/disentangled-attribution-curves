@@ -69,7 +69,7 @@ def fit_altered(data_dir, out_dir, dset_name, classification_only=True, random_s
     # load data and rf
     X, y = dsets.fetch_data(dset_name, return_X_y=True, 
                       local_cache_dir=data_dir)
-    train_X, test_X, train_y, test_y = train_test_split(X, y, random_state=random_state)
+    train_X, test_X, train_y, test_y = train_test_split(X, y, random_state=random_state) # defaults to 0.75: 0.25 splitx`
     logit = logit.fit(train_X, train_y)
     rf = rf.fit(train_X, train_y)
     

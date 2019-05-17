@@ -2,9 +2,9 @@ import itertools
 from slurmpy import Slurm
 import pmlb as dsets
 
-partition = 'low'
+partition = 'high'
 func_nums = range(1, 11)
-seeds = range(1, 11)
+seeds = range(11)
 
 # run
 s = Slurm("sim", {"partition": partition, "time": "3-0", "mem": "MaxMemPerNode"})

@@ -131,14 +131,18 @@ def calc_curves(X, y, df, X_cond, y_cond, forest, out_dir, func_num, C, rf_or_bo
     
 if __name__ == '__main__':
     
+    # experiments vary over value of fix_eigs, rf_or_boosting, and func_num
+    
+    
     # hyperparams
     func_num = 1
+    rf_or_boosting = 'boosting' # 'rf', 'boosting'
+    fix_eigs = True # False, True, 'iid'
+    out_dir = '/scratch/users/vision/chandan/boosting_no_rf/test' # sim_results_fix_cov_C=0.25''
+    
     seed = 1
-    n_train = 10000 # 70000
+    n_train = 70000 # 70000
     num_vars = 5
-    fix_eigs = 'iid' # False, True, 'iid'
-    out_dir = '/scratch/users/vision/chandan/boosting_no_rf/iid_stability' # sim_results_fix_cov_C=0.25''
-    rf_or_boosting = 'rf' # 'rf', 'boosting'
     use_rf = False
     C = 1
     
