@@ -25,75 +25,6 @@ OUTPUT
 a matrix with row vectors in the form [y_i, p(y_i)] for y_i unique y values in outcome_space_y, and
 p(y_i) a probability value associated with y_i
 """
-def interactions(model, input_space_x, outcome_space_y, assignment, S):
-    features = model.tree_.feature
-    thresholds = model.tree_.threshold
-    path = model.decision_path(assignment).indices
-    
-    # get all the decision rules
-    decision_rules = [] #store decisions as tuples: (feature, threshold, 0 if > or 1 if <=)
-    for i in path:
-        feature_ind = features[i]
-        if S[feature_ind] > 0 and feature_ind >= 0:
-            threshold = thresholds[i]
-            geq = assignment[0][feature_ind] >= threshold
-            decision_rules.append((feature_ind, threshold, geq))
-            
-            
-    # find all the outcomes which comply with these rules
-    outcomes = []
-    for i in range(len(outcome_space_y)):
-        complies = True
-        for d in decision_rules:
-            if(d[2]):
-                complies = complies and input_space_x[i][d[0]] >= d[1]
-            else:
-                complies = complies and input_space_x[i][d[0]] < d[1]
-        if complies:
-            outcomes.append(outcome_space_y[i])
-            
-    # get outcomes
-    unique, counts = np.unique(outcomes, return_counts = True)
-    unique = np.reshape(unique, (-1, 1))
-    probs = np.reshape(counts/len(outcomes), (-1, 1))
-    return np.hstack((unique, probs))
-
-def interactions_continuous(model, input_space_x, outcome_space_y, assignment, S, continuous_y = False):
-    features = model.tree_.feature
-    thresholds = model.tree_.threshold
-    path = model.decision_path(assignment).indices
-    decision_rules = {} #store decision rules in dictionary: feature => valid interval
-    for i in path:
-        feature_ind = features[i]
-        if feature_ind >= 0 and S[feature_ind] > 0:
-            threshold = thresholds[i]
-            leq = assignment[0][feature_ind] < threshold
-            bound = np.power(-1, leq) * float('inf')
-            interval = (min(threshold, bound), max(threshold, bound))
-            if(decision_rules.get(feature_ind) != None):
-                decision_rules[feature_ind] = join_intervals(decision_rules.get(feature_ind), interval)
-            else:
-                decision_rules[feature_ind] = interval
-    outcomes = []
-    features = list(decision_rules.keys())
-    rules = list(decision_rules.values())
-    for i in range(len(outcome_space_y)):
-        complies = True
-        for j in range(len(features)):
-            feature = features[j]
-            rule = rules[j]
-            coord = input_space_x[i][feature]
-            complies = complies and point_in_intervals(coord, [rule])
-        if complies:
-            outcomes.append(outcome_space_y[i])
-    if(continuous_y):
-        return np.average(outcomes)
-    unique, counts = np.unique(outcomes, return_counts = True)
-    unique = np.reshape(unique, (-1, 1))
-    probs = np.reshape(counts/len(outcomes), (-1, 1))
-    unshaped = np.hstack((unique, probs))
-    return fix_shape(unshaped, np.unique(outcome_space_y))
-
 def fast_interactions(model, input_space_x, outcome_space_y, assignment, S, continuous_y=True, class_id=1):
     features = model.tree_.feature
     thresholds = model.tree_.threshold
@@ -119,40 +50,7 @@ def fast_interactions(model, input_space_x, outcome_space_y, assignment, S, cont
         counts = np.count_nonzero(masked_y == class_id)
         return counts/len(masked_y)
 
-def interactions_set(model, input_space_x, outcome_space_y, assignment, S, continuous_y=True, class_id=1):
-    print(S)
-    features = model.tree_.feature
-    thresholds = model.tree_.threshold
-    path = model.decision_path(assignment).indices
-    features_used = features[path]
-    remove_leaves = features_used != -2
-    features_used = features_used[remove_leaves]
-    mask = S[features_used] == 1
-    features_relevant = features_used[mask]
-    print("features used", features_relevant)
-    if(len(features_relevant) == 0):
-        return "never encountered relevant features"
-    thresholds_used = thresholds[path]
-    thresholds_used = thresholds_used[remove_leaves]
-    thresholds_relevant = thresholds_used[mask]
-    print("thresholds", thresholds)
-    geq_list = np.transpose(np.transpose(assignment)[features_relevant]) >= thresholds_relevant
-    input_greater = np.transpose(np.transpose(input_space_x)[features_relevant]) >= thresholds_relevant
-    outputs = []
-    for geq in geq_list:
-        output_mask =  np.logical_and.reduce(input_greater == geq, axis = -1)
-        output_mask = np.reshape(output_mask, (1, -1))[0]
-        masked_y = outcome_space_y[output_mask]
-        if len(masked_y) == 0:
-            return 0
-        if(continuous_y):
-            outputs.append(np.mean(masked_y))
-        else:
-            counts = np.count_nonzero(masked_y == class_id)
-            outputs.append(counts/len(masked_y))
-    return outputs
-
-def interactions_forest(forest, input_space_x, outcome_space_y, assignment, S, continuous_y=True, class_id=1):
+def dac(forest, input_space_x, outcome_space_y, assignment, S, continuous_y=True, class_id=1):
     models = forest.estimators_
     avg = np.zeros(assignment.shape[0])
     for model in models:
@@ -371,6 +269,10 @@ def ada_boosted_curve_forest(forest, input_space_x, outcome_space_y, S, interval
 def ada_boosted_map_forest(forest, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, C, continuous_y = True):
     ada_weights = forest.estimator_weights_
     return make_map_forest(forest, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, C, continuous_y = True, weights = ada_weights)
+
+def dac_curve(forest, input_space_x, outcome_space_y, S, interval_x=None, interval_y=None, di_x=None, di_y=None, C=1, continuous_y=True, weights=None):
+    #new wrapper goes here
+    return Null
 
 def variance1D(forest, X, y, S, interval_x, di_x, continuous_y=True):
     data_mean = np.mean(y)
