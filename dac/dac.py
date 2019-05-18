@@ -270,7 +270,7 @@ def ada_boosted_map_forest(forest, input_space_x, outcome_space_y, S, interval_x
     ada_weights = forest.estimator_weights_
     return make_map_forest(forest, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, C, continuous_y = True, weights = ada_weights)
 
-def dac_curve(forest, input_space_x, outcome_space_y, S, interval_x=None, interval_y=None, di_x=None, di_y=None, C=1, continuous_y=True, weights=None):
+def dac_plot(forest, input_space_x, outcome_space_y, S, interval_x=None, interval_y=None, di_x=None, di_y=None, C=1, continuous_y=True, weights=None):
     #new wrapper goes here
     return Null
 
