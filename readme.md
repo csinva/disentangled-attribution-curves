@@ -1,8 +1,9 @@
 # disentangled attribution curves (DAC)
 Official code for using / reproducing DAC from the paper "Disentangled Attribution Curves for Interpreting Random Forests"
 
-*Note: this code is actively developed and maintained.*
+*Note: this code is actively developed and maintained. For any questions please file an issue.*
 
+![](figs/fig_xor.png)
 
 # documentation
 
@@ -51,10 +52,9 @@ Official code for using / reproducing DAC from the paper "Disentangled Attributi
       - ```dac_curve``` a numpy array containing values for the DAC curve or heatmap describing the interaction of the variables specified in S
 
 ## reproducing results from the paper
+
+![](figs/fig_hr_holiday.png)
+
 - the [examples/bike_sharing_dac.ipynb](examples/bike_sharing_dac.ipynb) folder contains examples of how to use DAC to reproducing the qualitative curves on the bike-sharing dataset in the paper
 - the [simulation script](experiments/simulation/run_sim_synthetic.py) replicates the experiments with running simulations
 - the [pmlb script](experiments/pmlb/run_dac_feature_engineered.py) replicates the experiments of automatic feature engineering on pmlb datasets
-
-
-# todo before submitting
-- remove scripts, eda folders, analyze nbs
