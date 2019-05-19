@@ -58,3 +58,11 @@ Official code for using / reproducing DAC from the paper "Disentangled Attributi
 - the [examples/bike_sharing_dac.ipynb](examples/bike_sharing_dac.ipynb) folder contains examples of how to use DAC to reproducing the qualitative curves on the bike-sharing dataset in the paper
 - the [simulation script](experiments/simulation/run_sim_synthetic.py) replicates the experiments with running simulations
 - the [pmlb script](experiments/pmlb/run_dac_feature_engineered.py) replicates the experiments of automatic feature engineering on pmlb datasets
+
+
+
+## dac animation
+
+*a gif demonstrating calculating a DAC curve for a simple tree*
+
+![](figs/dac_animated.gif)
