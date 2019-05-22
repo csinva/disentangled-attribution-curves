@@ -1,5 +1,5 @@
 # disentangled attribution curves (DAC)
-Official code for using / reproducing DAC from the paper "Disentangled Attribution Curves for Interpreting Random Forests"
+Official code for using / reproducing DAC from the paper "Disentangled Attribution Curves for Interpreting Random Forests" https://arxiv.org/abs/1905.07631v1
 
 *Note: this code is actively developed and maintained. For any questions please file an issue.*
 
@@ -53,7 +53,7 @@ Official code for using / reproducing DAC from the paper "Disentangled Attributi
 
 ## reproducing results from the paper
 
-![](figs/fig_hr_holiday.png)
+<img src="figs/fig_hr_holiday.png" width="50%">
 
 - the [examples/bike_sharing_dac.ipynb](examples/bike_sharing_dac.ipynb) folder contains examples of how to use DAC to reproducing the qualitative curves on the bike-sharing dataset in the paper
 - the [simulation script](experiments/simulation/run_sim_synthetic.py) replicates the experiments with running simulations
