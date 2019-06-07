@@ -24,13 +24,13 @@ Official code for using / reproducing DAC from the paper "Disentangled Attributi
       - `class_id`: if classification, the class value to return proportions for, defaults to 1
   - returns
   
-    - `dac_curve`
+    - `dac.dac_curve`
   
       - for regression: a numpy array whose length corresponds to the number of samples in the assignment input.  Each entry is a DAC importance score, a
         float between min(outcome_space_y) and max(outcome_space_y)
       - for classification: a numpy array whose length corresponds to the number of samples in the assignment input.  Each entry is a DAC importance score, a
         float between 0 and 1
-- ```dac_plot(forest, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, C, continuous_y, weights```
+- ```dac.dac_plot(forest, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, C, continuous_y, weights```
     - inputs
       - `forest`: an sklearn ensemble of decision trees (random forest or adaboosted forest)
       - `input_space_x`: the matrix of training data (feature values), a numpy 2D array
@@ -66,3 +66,25 @@ Official code for using / reproducing DAC from the paper "Disentangled Attributi
 *a gif demonstrating calculating a DAC curve for a simple tree*
 
 ![](figs/dac_animated.gif)
+
+
+
+# related work
+
+- this work is part of an overarching project on interpretable machine learning, guided by the [PDR framework](https://arxiv.org/abs/1901.04592) for interpretable machine learning
+- for related work, see the [github repo](https://github.com/csinva/hierarchical-dnn-interpretations) for disentangled hierarchical dnn interpretations ([ICLR 2019](https://arxiv.org/abs/1806.05337))
+
+# reference
+
+- feel free to use/share this code openly
+
+- citation for this work:
+
+  ```c
+@article{devlin2019disentangled,
+    title={Disentangled Attribution Curves for Interpreting Random Forests and Boosted Trees},
+    author={Devlin, Summer and Singh, Chandan and Murdoch, W James and Yu, Bin},
+    journal={arXiv preprint arXiv:1905.07631},
+    year={2019}
+}
+  ```

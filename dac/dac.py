@@ -3,13 +3,24 @@ import time
 import matplotlib.pyplot as plt
 from sklearn import tree
 from collections import Counter
-
-# from model_train import *
 import sys
 sys.path.append('../data')
-#from data import *
-#from intervals import *
-#from piecewise import piecewise_average_1d
+
+
+def dac(forest, input_space_x, outcome_space_y, assignment, S, continuous_y=True, class_id=1):
+    models = forest.estimators_
+    avg = np.zeros(assignment.shape[0])
+    for model in models:
+        for i in range(assignment.shape[0]):
+            point = np.reshape(assignment[i, :], (1, -1))
+            val = fast_interactions(model, input_space_x, outcome_space_y, point, S, continuous_y, class_id)
+            if val != "never encountered relevant features":
+                avg[i] += val
+    return avg/len(models)
+
+
+def dac_plot(forest, input_space_x, outcome_space_y, S, interval_x=None, interval_y=None, di_x=None, di_y=None, C=1, continuous_y=True, weights=None):
+    raise NotImplementedError
 
 """
 PARAMETERS
@@ -49,17 +60,6 @@ def fast_interactions(model, input_space_x, outcome_space_y, assignment, S, cont
     else:
         counts = np.count_nonzero(masked_y == class_id)
         return counts/len(masked_y)
-
-def dac(forest, input_space_x, outcome_space_y, assignment, S, continuous_y=True, class_id=1):
-    models = forest.estimators_
-    avg = np.zeros(assignment.shape[0])
-    for model in models:
-        for i in range(assignment.shape[0]):
-            point = np.reshape(assignment[i, :], (1, -1))
-            val = fast_interactions(model, input_space_x, outcome_space_y, point, S, continuous_y, class_id)
-            if val != "never encountered relevant features":
-                avg[i] += val
-    return avg/len(models)
 
 def fix_shape(distribution, unique_Y):
     if(distribution.shape[0] == len(unique_Y)):
@@ -269,10 +269,6 @@ def ada_boosted_curve_forest(forest, input_space_x, outcome_space_y, S, interval
 def ada_boosted_map_forest(forest, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, C, continuous_y = True):
     ada_weights = forest.estimator_weights_
     return make_map_forest(forest, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, C, continuous_y = True, weights = ada_weights)
-
-def dac_plot(forest, input_space_x, outcome_space_y, S, interval_x=None, interval_y=None, di_x=None, di_y=None, C=1, continuous_y=True, weights=None):
-    #new wrapper goes here
-    return Null
 
 def variance1D(forest, X, y, S, interval_x, di_x, continuous_y=True):
     data_mean = np.mean(y)
