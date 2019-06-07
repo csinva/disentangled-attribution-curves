@@ -81,10 +81,10 @@ Official code for using / reproducing DAC from the paper "Disentangled Attributi
 - citation for this work:
 
   ```c
-@article{devlin2019disentangled,
-    title={Disentangled Attribution Curves for Interpreting Random Forests and Boosted Trees},
-    author={Devlin, Summer and Singh, Chandan and Murdoch, W James and Yu, Bin},
-    journal={arXiv preprint arXiv:1905.07631},
-    year={2019}
-}
+  @article{devlin2019disentangled,
+      title={Disentangled Attribution Curves for Interpreting Random Forests and Boosted Trees},
+      author={Devlin, Summer and Singh, Chandan and Murdoch, W James and Yu, Bin},
+      journal={arXiv preprint arXiv:1905.07631},
+      year={2019}
+  }
   ```
