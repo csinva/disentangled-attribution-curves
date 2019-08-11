@@ -8,11 +8,11 @@ Official code for using / reproducing DAC from the paper "Disentangled Attributi
 # documentation
 
 ## using DAC on new models
+- quick install: `pip install git+https://github.com/csinva/disentangled-attribution-curves`
 - the core of the method code lies in the [dac](dac) folder and is compatible with scikit-learn
 - the [examples/xor_dac.ipynb](examples/simple_ex.py) folder contains examples of how to use DAC on a new dataset with some simple datasets (e.g. XOR, etc.)
-- the basic api consists of two functions: `dac` and `dac_plot`
-- ```dac.dac(forest, input_space_x, outcome_space_y, assignment, S, continuous_y=True, class_id=1)```
-  
+- the basic api consists of two functions: `from dac import dac, dac_plot`
+- ```dac(forest, input_space_x, outcome_space_y, assignment, S, continuous_y=True, class_id=1)```
   - inputs:
   	
       - `forest`: an sklearn ensemble of decision trees
@@ -24,13 +24,12 @@ Official code for using / reproducing DAC from the paper "Disentangled Attributi
       - `class_id`: if classification, the class value to return proportions for, defaults to 1
   - returns
   
-    - `dac.dac_curve`
-  
-      - for regression: a numpy array whose length corresponds to the number of samples in the assignment input.  Each entry is a DAC importance score, a
+    - `dac_curve`
+  - for regression: a numpy array whose length corresponds to the number of samples in the assignment input.  Each entry is a DAC importance score, a
         float between min(outcome_space_y) and max(outcome_space_y)
       - for classification: a numpy array whose length corresponds to the number of samples in the assignment input.  Each entry is a DAC importance score, a
         float between 0 and 1
-- ```dac.dac_plot(forest, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, C, continuous_y, weights```
+- ```dac_plot(forest, input_space_x, outcome_space_y, S, interval_x, interval_y, di_x, di_y, C, continuous_y, weights```
     - inputs
       - `forest`: an sklearn ensemble of decision trees (random forest or adaboosted forest)
       - `input_space_x`: the matrix of training data (feature values), a numpy 2D array
