@@ -1,5 +1,6 @@
 import numpy as np
 import time
+import re
 import matplotlib.pyplot as plt
 from sklearn import tree
 from collections import Counter
@@ -243,11 +244,9 @@ def make_curve_forest(forest, input_space_x, outcome_space_y, S, interval_x, di,
     if weights is None:
         weights = np.ones(len(models))
     for i in range(len(models)):
-        #print("starting model", i, "at", time.ctime())
         model = models[i]
         w = weights[i]
         final_curve += w * make_curve(model, input_space_x, outcome_space_y, S, interval_x, di, C, continuous_y)
-        #print("model", i, "of", total, "complete at", time.ctime())
         i += 1
     return final_curve/np.sum(weights)
 
